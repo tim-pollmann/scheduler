@@ -1,8 +1,9 @@
 import logging
+import sys
 
 
 class Process:
-    def __init__(self, name, ready_time, exec_time, deadline):
+    def __init__(self, name, ready_time, exec_time, deadline=sys.maxsize):
         self._name = name
         self._ready_time = ready_time
         self._exec_time = exec_time

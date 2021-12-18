@@ -1,7 +1,6 @@
 import logging
 import sys
 from abc import ABC, abstractmethod
-from enums import ProcessStates
 
 
 class Scheduler(ABC):
@@ -18,9 +17,17 @@ class Scheduler(ABC):
                 self._blocked_processes.append(process)
         
         self._blocked_processes.sort(key=lambda p: p.ready_time)
-        self._mainloop()
+
+    def avg_ready_time(self):
+        ready_time = 0
+        n_finished_processes = len(self._finished_processes)
+
+        for idx, finished_process in enumerate(self._finished_processes):
+            ready_time += (n_finished_processes - idx) * finished_process.exec_time
+        
+        return ready_time / n_finished_processes
     
-    def _mainloop(self):
+    def start(self):
         while len(self._ready_processes) + len(self._blocked_processes) > 0:
             if len(self._ready_processes) > 0:
                 process, finished, used_time = self._run_next_process()
@@ -39,13 +46,16 @@ class Scheduler(ABC):
             self._update_blocked_processes()     
 
     def _update_blocked_processes(self):
+        counter = 0
         for blocked_process in self._blocked_processes:
             if blocked_process.ready_time > self._time:
                 break
-
-            process = self._blocked_processes.pop(0)
-            self._ready_processes.append(process)
-            logging.info(f'Process "{process.name} was added to the list of ready processes')
+            
+            self._ready_processes.append(blocked_process)
+            counter += 1
+            logging.info(f'Process "{blocked_process.name} was added to the list of ready processes')
+        
+        self._blocked_processes = self._blocked_processes[counter:]
 
     @abstractmethod
     def _run_next_process(self):
