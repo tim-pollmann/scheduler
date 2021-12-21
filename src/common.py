@@ -7,6 +7,7 @@ class Process:
         self._deadline = deadline
         self._program_counter = 0
         self._finished_time = -1
+        self._history = []
 
     @property
     def ready_time(self):
@@ -36,6 +37,16 @@ class Process:
     @property
     def is_finished(self):
         return self._exec_time <= self._program_counter
+
+    @property
+    def history(self):
+        return self._history
+
+    @history.setter
+    def history(self, value):
+        self._history = value
+
+   
 
     def exec_atomic_command(self):
         self._program_counter += 1

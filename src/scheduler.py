@@ -1,34 +1,42 @@
 from common import CPU
 from abc import ABC, abstractmethod
-from matplotlib import pyplot as plt
+
 
 # base class for all schedulers
 class Scheduler(ABC):
     def __init__(self, processes, n_cpus):
         self._time = 0
+        self._all_ps = processes
         self._blocked_ps = processes
         self._ready_ps = []
         self._finished_ps = []
         self._cpus = [CPU() for _ in range(n_cpus)]
 
+    @property
+    def all_processes(self):
+        return self._all_ps
+
     # calculates the average time needed for each process to be finished
     def avg_time(self):
         return sum([p.finished_time for p in self._finished_ps]) / len(self._finished_ps)
     
-    def start(self):
+    def step(self):
         # while there are ready or blocked processes or processes currently running on a cpu
-        while len(self._ready_ps) + len(self._blocked_ps) > 0 or len([None for cpu in self._cpus if cpu.is_allocated]):
+        if len(self._ready_ps) + len(self._blocked_ps) + len([None for cpu in self._cpus if cpu.is_allocated]) == 0:
+            return False
             # 1.) move processes, that got ready at the current time, from thre blocked-list to the ready list
-            self._ready_ps.extend([p for p in self._blocked_ps if p.ready_time <= self._time])
-            self._blocked_ps = [blocked_p for blocked_p in self._blocked_ps if blocked_p not in self._ready_ps]
+        self._ready_ps.extend([p for p in self._blocked_ps if p.ready_time <= self._time])
+        self._blocked_ps = [blocked_p for blocked_p in self._blocked_ps if blocked_p not in self._ready_ps]
             # 2.) allocate processes to the cpus
-            self._update_cpu_allocation()
-    	    # 3.) execute all allocated processes
-            for cpu in self._cpus:
-                if cpu.is_allocated:
-                    cpu.process.exec_atomic_command()
+        self._update_cpu_allocation()
+    	# 3.) execute all allocated processes
+        for cpu_idx, cpu in enumerate(self._cpus):
+            if cpu.is_allocated:
+                cpu.process.exec_atomic_command()
+                cpu.process.history.append((self._time, cpu_idx))
             # 4.) increment internal timer
-            self._time += 1
+        self._time += 1
+        return True
 
     # a method implemented by child classes that updates the cpu allocation (different for nonpreemtive and preemptive schedulers)
     @abstractmethod
