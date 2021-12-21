@@ -1,22 +1,41 @@
 import logging
+import copy
 from common import Process
-from scheduler import FCFS_Scheduler, SJF_Scheduler, LLF_Scheduler, RR_Scheduler
+from scheduler import NP_FCFS_Scheduler, NP_SJF_Scheduler, NP_EDF_Scheduler, NP_LLF_Scheduler, P_SJF_Scheduler, P_EDF_Scheduler, P_RR_Scheduler
 
+
+NO_DEADLINE_PROCESSES = [Process(0, 22), Process(0, 2), Process(0, 3), Process(0, 5), Process(0, 8)]
+EDF_PROCESSES = [Process(0, 2, 4), Process(3, 3, 14), Process(6, 3, 12), Process(5, 4, 10)]
 
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
 
-# scheduler = FCFS_Scheduler([Process(0, 22, 5), Process(0, 2, 5), Process(0, 3, 5), Process(0, 5, 5), Process(0, 8, 5)], 1)
-# scheduler.start()
-# logging.info(f'Average ready time of the FCFS-Scheduler was {scheduler.avg_ready_time()}.')
-
-# scheduler = SJF_Scheduler([Process(0, 22, 5), Process(0, 2, 5), Process(0, 3, 5), Process(0, 5, 5), Process(0, 8, 5)], 1)
-# scheduler.start()
-# logging.info(f'Average ready time of the SJF-Scheduler was {scheduler.avg_ready_time()}.')
-
-scheduler = LLF_Scheduler([Process(0, 8, 10), Process(0, 5, 9), Process(0, 4, 9)], 2)
+# nonpreemtive schedulers
+scheduler = NP_FCFS_Scheduler(processes=copy.deepcopy(NO_DEADLINE_PROCESSES), n_cpus=1)
 scheduler.start()
-logging.info(f'Average ready time of the LLF-Scheduler was {scheduler.avg_ready_time()}.')
+logging.info(f'Average ready time of the nonpremptive FCFS-Scheduler was {scheduler.avg_time()}.')
 
-scheduler = RR_Scheduler([Process(0, 22, 5), Process(0, 2, 5), Process(0, 3, 5), Process(0, 5, 5), Process(0, 8, 5)], 3)
+scheduler = NP_SJF_Scheduler(processes=copy.deepcopy(NO_DEADLINE_PROCESSES), n_cpus=1)
 scheduler.start()
-logging.info(f'Average ready time of the RR-Scheduler was {scheduler.avg_ready_time()}.')
+logging.info(f'Average ready time of the nonpremptive SJF-Scheduler was {scheduler.avg_time()}.')
+
+scheduler = NP_EDF_Scheduler(processes=copy.deepcopy(EDF_PROCESSES), n_cpus=1)
+scheduler.start()
+logging.info(f'Average ready time of the nonpremptive EDF-Scheduler was {scheduler.avg_time()}.')
+
+scheduler = NP_LLF_Scheduler(processes=[Process(0, 8, 10), Process(0, 5, 9), Process(0, 4, 9)], n_cpus=2)
+scheduler.start()
+logging.info(f'Average ready time of the nonpremptive LLF-Scheduler was {scheduler.avg_time()}.')
+
+
+# preemptive schedulers
+scheduler = P_SJF_Scheduler(processes=copy.deepcopy(NO_DEADLINE_PROCESSES))
+scheduler.start()
+logging.info(f'Average ready time of the premptive SJF-Scheduler was {scheduler.avg_time()}.')
+
+scheduler = P_EDF_Scheduler(processes=copy.deepcopy(EDF_PROCESSES))
+scheduler.start()
+logging.info(f'Average ready time of the premptive EDF-Scheduler was {scheduler.avg_time()}.')
+
+# scheduler = P_RR_Scheduler(processes=copy.deepcopy(NO_DEADLINE_PROCESSES), quantum=3)
+# scheduler.start()
+# logging.info(f'Average ready time of the RR-Scheduler was {scheduler.avg_time()}.')

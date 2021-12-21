@@ -1,113 +1,154 @@
-import logging
 from common import CPU
 from abc import ABC, abstractmethod
+from matplotlib import pyplot as plt
 
-
+# base class for all schedulers
 class Scheduler(ABC):
     def __init__(self, processes, n_cpus):
         self._time = 0
-        self._ps = processes
-        self._blocked_ps = self._ps
+        self._blocked_ps = processes
         self._ready_ps = []
         self._finished_ps = []
         self._cpus = [CPU() for _ in range(n_cpus)]
 
-    def avg_ready_time(self):
-        print([p.finished_time for p in self._finished_ps])
+    # calculates the average time needed for each process to be finished
+    def avg_time(self):
         return sum([p.finished_time for p in self._finished_ps]) / len(self._finished_ps)
     
     def start(self):
-        while len(self._finished_ps) < len(self._ps):
-            self._update_ready_processes()
+        # while there are ready or blocked processes or processes currently running on a cpu
+        while len(self._ready_ps) + len(self._blocked_ps) > 0 or len([None for cpu in self._cpus if cpu.is_allocated]):
+            # 1.) move processes, that got ready at the current time, from thre blocked-list to the ready list
+            self._ready_ps.extend([p for p in self._blocked_ps if p.ready_time <= self._time])
+            self._blocked_ps = [blocked_p for blocked_p in self._blocked_ps if blocked_p not in self._ready_ps]
+            # 2.) allocate processes to the cpus
             self._update_cpu_allocation()
-            self._run_allocated_processes()
+    	    # 3.) execute all allocated processes
+            for cpu in self._cpus:
+                if cpu.is_allocated:
+                    cpu.process.exec_atomic_command()
+            # 4.) increment internal timer
             self._time += 1
 
-    def _update_ready_processes(self):
-        ready_ps = [p for p in self._blocked_ps if p.ready_time <= self._time]
-        self._ready_ps.extend(ready_ps)
-        self._blocked_ps = [blocked_p for blocked_p in self._blocked_ps if blocked_p not in ready_ps]
-        for p in ready_ps:
-            logging.info(f'[TIME = {self._time}] Process "{self._ps.index(p) + 1}" was added to the list of ready processes')
-        
-
+    # a method implemented by child classes that updates the cpu allocation (different for nonpreemtive and preemptive schedulers)
     @abstractmethod
     def _update_cpu_allocation(self):
         pass
 
-    def _run_allocated_processes(self):
-        for cpu in self._cpus:
-            if cpu.is_allocated:
-                cpu.p.exec_atomic_command()
-                logging.info(f'[TIME = {self._time}] Process "{self._ps.index(cpu.p) + 1}" running on CPU #{self._cpus.index(cpu) + 1}')
+    # a method implemented by child classes that returns the process to be executed based on its strategy
+    @abstractmethod
+    def _select_next_process(self):
+        pass
 
 
+# base class for all nonpreemptive schedulers
 class NonPreemptiveScheduler(Scheduler):
     def __init__(self, processes, n_cpus):
         super().__init__(processes, n_cpus)
 
     def _update_cpu_allocation(self):
         for cpu in self._cpus:
-            if cpu.is_allocated and cpu.p.is_finished:
-                logging.info(f'[TIME = {self._time - 1}] Process "{self._ps.index(cpu.p) + 1}" finished')
-                cpu.p.finished_time = self._time
-                self._finished_ps.append(cpu.p)
-                cpu._p = None
-            if (not cpu.is_allocated or (cpu.is_allocated and cpu.p.is_finished)) and len(self._ready_ps) > 0:
-                next_p = self._select_next_process()
-                cpu.p = next_p
-                self._ready_ps.remove(next_p)
-
-    @abstractmethod
-    def _select_next_process(self):
-        pass
+            # if an cpus process has finished
+            if cpu.has_finished_process:
+                cpu.process.finished_time = self._time
+                self._finished_ps.append(cpu.process)
+                cpu.unallocate()
+            # if a cpu is not allocated and there are ready processes
+            if not cpu.is_allocated and self._ready_ps:
+                cpu.allocate(self._select_next_process())
+                self._ready_ps.remove(cpu.process)
 
 
-class FCFS_Scheduler(NonPreemptiveScheduler):
+# base class for all nonpreemptive schedulers
+# this kind of schedulers have always just one processor available
+class PreemptiveScheduler(Scheduler):
+    def __init__(self, processes):
+        super().__init__(processes, 1)
+
+    def _update_cpu_allocation(self):
+        # if the cpus process has finished
+        if self._cpus[0].has_finished_process:
+            self._cpus[0].process.finished_time = self._time
+            self._finished_ps.append(self._cpus[0].process)
+        # if the cpu is allocated with an unfinished process
+        elif self._cpus[0].is_allocated:
+            self._ready_ps.append(self._cpus[0].process)
+        self._cpus[0].unallocate()
+        # if there are ready processes
+        if self._ready_ps:
+            self._cpus[0].allocate(self._select_next_process())
+            self._ready_ps.remove(self._cpus[0].process)
+
+
+# class for nonpreemtive "first come first served"-schedulers
+class NP_FCFS_Scheduler(NonPreemptiveScheduler):
     def __init__(self, processes, n_cpus):
         super().__init__(processes, n_cpus)
 
     def _select_next_process(self):
+        # just select the first process in the ready-list since the ready-list is in the order of the arrival of the processes
         return self._ready_ps[0]
 
 
-class SJF_Scheduler(NonPreemptiveScheduler):
+# class for nonpreemtive "shortest job first"-schedulers
+class NP_SJF_Scheduler(NonPreemptiveScheduler):
     def __init__(self, processes, n_cpus):
         super().__init__(processes, n_cpus)
 
     def _select_next_process(self):
+        # select the process from the ready-list, that has the lowest execution time
         return min(self._ready_ps, key=lambda p: p.exec_time)
 
 
-class LLF_Scheduler(NonPreemptiveScheduler):
+# class for nonpreemtive "earliest deadline first"-schedulers
+class NP_EDF_Scheduler(NonPreemptiveScheduler):
     def __init__(self, processes, n_cpus):
         super().__init__(processes, n_cpus)
 
     def _select_next_process(self):
-        return min(self._ready_ps, key=lambda p: p.laxity)
+        # select the process from the ready-list, that has the lowest execution time
+        return min(self._ready_ps, key=lambda p: p.deadline)
 
 
-class RR_Scheduler(Scheduler):
+# class for nonpreemtive "least laxity first"-schedulers
+class NP_LLF_Scheduler(NonPreemptiveScheduler):
+    def __init__(self, processes, n_cpus):
+        super().__init__(processes, n_cpus)
+
+    def _select_next_process(self):
+        # select the process from the ready-list, that has the lowest laxity
+        return min(self._ready_ps, key=lambda p: p.deadline - p.ready_time - p.exec_time)
+
+
+# class for preemtive "shortest job first"-schedulers
+class P_SJF_Scheduler(PreemptiveScheduler):
+    def __init__(self, processes):
+        super().__init__(processes)
+
+    def _select_next_process(self):
+        # select the process from the ready-list, that has the lowest execution time
+        return min(self._ready_ps, key=lambda p: p.exec_time)
+
+
+# class for preemtive "earliest deadline first"-schedulers
+class P_EDF_Scheduler(PreemptiveScheduler):
+    def __init__(self, processes):
+        super().__init__(processes)
+
+    def _select_next_process(self):
+        # select the process from the ready-list, that has the lowest execution time
+        return min(self._ready_ps, key=lambda p: p.deadline)
+
+
+# class for preemtive "round robin"-schedulers
+# needs to be initialzied with an quantum
+class P_RR_Scheduler(PreemptiveScheduler):
     def __init__(self, processes, quantum):
         self._quantum = quantum
         self._quantum_counter = -1
         self._current_index = -1
+        self._last_process = None
         super().__init__(processes, 1)
 
-    def _update_cpu_allocation(self):
-        self._quantum_counter += 1
-        cpu = self._cpus[0]
-        if cpu.is_allocated and cpu.p.is_finished:
-            cpu.p.finished_time = self._time
-            self._finished_ps.append(cpu.p)
-            self._ready_ps.remove(cpu.p)
-            self._quantum_counter = 0
-            logging.info(f'[TIME = {self._time}] Process "{self._ps.index(cpu.p) + 1}" finished')
-        elif self._quantum_counter % self._quantum == 0:
-                self._quantum_counter = 0
-                self._current_index += 1
-        if self._current_index >= len(self._ready_ps):
-            self._current_index = 0
-        if len(self._ready_ps) > 0:
-            cpu.p = self._ready_ps[self._current_index]
-        
+    def _select_next_process(self):
+        pass
