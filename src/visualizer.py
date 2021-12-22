@@ -50,10 +50,12 @@ class Visualizer:
         self._graph_data = []
 
         self._log_ax = axd['logger']
-        self._graph_data.append(self._log_ax.text(0, 0, '', fontsize=10, verticalalignment='bottom'))
+        # self._graph_data.append(self._log_ax.text(0, 0, '', fontsize=10, verticalalignment='bottom'))
         self._log_ax.xaxis.set_ticks([])
         self._log_ax.yaxis.set_ticks([])
         self._log_ax.set_title('LOGGER')
+        self._text_box = TextBox(self._log_ax, '')
+        self._text_box.set_val('') 
 
         self._start_button = Button(axd['start'], 'Start')
         self._start_button.on_clicked(self._start_scheduler)
@@ -82,7 +84,8 @@ class Visualizer:
             new_data = self._graph_ax.plot(time_values, cpu_values, PROCESS_FORMATS[p_idx], label=f'Process {p_idx}')[0]
             self._graph_data.append(new_data)
 
-        self._graph_data.append(self._log_ax.text(0, 0, self._scheduler.logger, fontsize=8, verticalalignment='bottom'))
+        # self._graph_data.append(self._log_ax.text(0, 0, self._scheduler.logger, fontsize=8, verticalalignment='bottom'))
+        self._text_box.set_val(self._scheduler.logger)
         self._graph_ax.legend(loc='upper right')
         self._fig.canvas.draw_idle()
 
