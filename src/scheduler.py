@@ -11,10 +11,19 @@ class Scheduler(ABC):
         self._ready_ps = []
         self._finished_ps = []
         self._cpus = [CPU() for _ in range(n_cpus)]
+        self._logger = ''
+        self._log(f'Initialized scheduler with {n_cpus} CPUs...')
+
+    @property
+    def logger(self):
+        return self._logger
 
     @property
     def all_processes(self):
         return self._all_ps
+
+    def _log(self, text):
+        self._logger += '\n ' + text
 
     # calculates the average time needed for each process to be finished
     def avg_time(self):
@@ -23,6 +32,7 @@ class Scheduler(ABC):
     def step(self):
         # while there are ready or blocked processes or processes currently running on a cpu
         if len(self._ready_ps) + len(self._blocked_ps) + len([None for cpu in self._cpus if cpu.is_allocated]) == 0:
+            self._log(f'Average ready time was {self.avg_time()}...')
             return False
             # 1.) move processes, that got ready at the current time, from thre blocked-list to the ready list
         self._ready_ps.extend([p for p in self._blocked_ps if p.ready_time <= self._time])
@@ -60,11 +70,13 @@ class NonPreemptiveScheduler(Scheduler):
             if cpu.has_finished_process:
                 cpu.process.finished_time = self._time
                 self._finished_ps.append(cpu.process)
+                self._log(f'Finished process {self._all_ps.index(cpu.process)}...')
                 cpu.unallocate()
             # if a cpu is not allocated and there are ready processes
             if not cpu.is_allocated and self._ready_ps:
                 cpu.allocate(self._select_next_process())
                 self._ready_ps.remove(cpu.process)
+                self._log(f'Allocated process {self._all_ps.index(cpu.process)} to CPU #{self._cpus.index(cpu)}...')
 
 
 # base class for all nonpreemptive schedulers
@@ -78,6 +90,7 @@ class PreemptiveScheduler(Scheduler):
         if self._cpus[0].has_finished_process:
             self._cpus[0].process.finished_time = self._time
             self._finished_ps.append(self._cpus[0].process)
+            self._log(f'Finished process {self._all_ps.index(self._cpus[0].process)}...')
         # if the cpu is allocated with an unfinished process
         elif self._cpus[0].is_allocated:
             self._ready_ps.append(self._cpus[0].process)
@@ -86,6 +99,7 @@ class PreemptiveScheduler(Scheduler):
         if self._ready_ps:
             self._cpus[0].allocate(self._select_next_process())
             self._ready_ps.remove(self._cpus[0].process)
+            self._log(f'Allocated process {self._all_ps.index(self._cpus[0].process)}...')
 
 
 # class for nonpreemtive "first come first served"-schedulers
