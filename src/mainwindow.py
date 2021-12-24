@@ -1,13 +1,35 @@
 import sys
 
 from PyQt5.QtWidgets import QApplication, QGridLayout, QFormLayout, QMainWindow, QSpinBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton, QCheckBox
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import numpy as np
 
-from constants import MAX_CPUS, MAX_TIME, STRATEGIES, LINE_WIDTH, PROCESS_COLORS
+from cpu import CPU
+from process import Process
 from scheduler import NP_FCFS_Scheduler, NP_SJF_Scheduler, NP_EDF_Scheduler, NP_LLF_Scheduler, P_SJF_Scheduler, P_EDF_Scheduler, P_RR_Scheduler
+
+
+MAX_CPUS = 4
+MAX_TIME = 100
+LINE_WIDTH = 0.2
+PROCESS_COLORS = [
+    'red', 'blue', 'green', 'yellow', 'magenta', 'grey', 'cyan', 'chocolate', 'blueviolet', 'brown', 'darkred', 'salmon', 'gold', 'khaki', 'hotpink',
+    'limegreen', 'lightblue', 'navy', 'olive', 'orange'
+]
+
+STRATEGIES = [
+    'First Come First Serve (nonpreemptive)',
+    'Shortest Job First (nonpreemptive)',
+    'Earliest Deadline First (nonpreemptive)',
+    'Least Laxity First (nonpreemptive)',
+    'Shortest Job First (preemptive)',
+    'Earliest Deadline First (preemptive)',
+    'Round Robin (preemptive)'
+]
 
 
 class MainWindow(QMainWindow):
@@ -20,30 +42,29 @@ class MainWindow(QMainWindow):
         self._graph_data = []
 
     def _init_sim_button_clicked(self):
-        n_cpus = self._ui['n_cpus_selection'].value()
+        n_cpus = [CPU(idx + 1) for idx in range(self._ui['n_cpus_selection'].value())]
 
-        process_data = [(ready_time_box.value(), exec_time_box.value(), deadline_box.value()) 
-                        for (checkbox, ready_time_box, exec_time_box, deadline_box)
-                        in self._ui['process_selection']
-                        if checkbox.isChecked()]
-        print(process_data)
+        processes = [Process(idx + 1, ready_time_box.value(), exec_time_box.value(), deadline_box.value()) 
+                    for idx, (checkbox, ready_time_box, exec_time_box, deadline_box)
+                    in enumerate(self._ui['process_selection'])
+                    if checkbox.isChecked()]
 
         match self._ui['strategy_selection'].currentIndex():
             case 0:
-                self._scheduler = NP_FCFS_Scheduler(n_cpus, process_data)
+                self._scheduler = NP_FCFS_Scheduler(n_cpus, processes)
             case 1:
-                self._scheduler = NP_SJF_Scheduler(n_cpus, process_data)
+                self._scheduler = NP_SJF_Scheduler(n_cpus, processes)
             case 2:
-                self._scheduler = NP_EDF_Scheduler(n_cpus, process_data)
+                self._scheduler = NP_EDF_Scheduler(n_cpus, processes)
             case 3:
-                self._scheduler = NP_LLF_Scheduler(n_cpus, process_data)
+                self._scheduler = NP_LLF_Scheduler(n_cpus, processes)
             case 4:
-                self._scheduler = P_SJF_Scheduler(process_data)
+                self._scheduler = P_SJF_Scheduler(processes)
             case 5:
-                self._scheduler = P_EDF_Scheduler(process_data)
+                self._scheduler = P_EDF_Scheduler(processes)
             case 6:
                 quantum = 3
-                self._scheduler = P_RR_Scheduler(process_data, quantum)
+                self._scheduler = P_RR_Scheduler(processes, quantum)
 
         self._ui['init_sim_button'].setEnabled(False)
         self._ui['next_step_button'].setEnabled(True)
@@ -107,22 +128,27 @@ class MainWindow(QMainWindow):
         self._ui['graph_axes'].xaxis.tick_top()
         self._ui['graph_axes'].xaxis.set_label_position('top') 
         self._ui['graph_axes'].set_xlim(0, MAX_TIME)
-        self._ui['graph_axes'].set_ylim(- 0.5, MAX_CPUS - 0.5)
-        self._ui['graph_axes'].xaxis.set_ticks(np.arange(0, MAX_TIME + 1, 5))
+        self._ui['graph_axes'].set_ylim(0.5, MAX_CPUS + 0.5)
+        self._ui['graph_axes'].set_xticks(np.arange(0, MAX_TIME + 1, 5))
         self._ui['graph_axes'].set_xticks(np.arange(0, MAX_TIME + 1, 1), minor=True)
-        self._ui['graph_axes'].yaxis.set_ticks(np.arange(0, MAX_CPUS, 1))
+        self._ui['graph_axes'].set_yticks(np.arange(1, MAX_CPUS + 1, 1))
         self._ui['graph_axes'].grid(axis='x', which='major', alpha=0.7) 
         self._ui['graph_axes'].grid(axis='x', which='minor', alpha=0.35)
         self._ui['graph_canvas'] = Canvas(fig)
 
     def _init_qt(self):
+        def create_spinbox(min, max):
+            spinbox = QSpinBox()
+            spinbox.setRange(min, max)
+            return spinbox
+
         self._ui['logger'] = QLabel('')
+        self._ui['logger'].setAlignment(Qt.AlignmentFlag.AlignBottom)
 
         self._ui['strategy_selection'] = QComboBox()
         self._ui['strategy_selection'].addItems(STRATEGIES)
         
-        self._ui['n_cpus_selection'] = QSpinBox()
-        self._ui['n_cpus_selection'].setRange(1, 3)
+        self._ui['n_cpus_selection'] = create_spinbox(1, MAX_CPUS)
 
         form_layout = QFormLayout()
         form_layout.addRow(QLabel('Scheduler-Strategy'), self._ui['strategy_selection'])
@@ -146,31 +172,26 @@ class MainWindow(QMainWindow):
         process_layout.addWidget(QLabel('Execution Time'), 0, 3)
         process_layout.addWidget(QLabel('Deadline'), 0, 4)
 
-        process_checkboxes = []
-        ready_time_spinboxes = []
-        exec_time_spinboxes = []
-        deadline_spinboxes = []
-
-        def create_spinbox(min, max, list):
-            spinbox = QSpinBox()
-            spinbox.setRange(min, max)
-            list.append(spinbox)
-            return spinbox
+        self._ui['process_selection'] = []
 
         for row in range(len(PROCESS_COLORS)):
             checkbox = QCheckBox()
-            process_checkboxes.append(checkbox)
-            process_layout.addWidget(checkbox, row + 1, 0)
-            process_layout.addWidget(QLabel(str(row + 1)), row + 1, 1)
-            process_layout.addWidget(create_spinbox(0, 49, ready_time_spinboxes), row + 1, 2)
-            process_layout.addWidget(create_spinbox(1, 49, exec_time_spinboxes), row + 1, 3)
-            process_layout.addWidget(create_spinbox(1, 49, deadline_spinboxes), row + 1, 4)
-
-        self._ui['process_selection'] = zip(process_checkboxes, ready_time_spinboxes, exec_time_spinboxes, deadline_spinboxes)
+            process_layout.addWidget(checkbox, row + 1, 0, Qt.AlignmentFlag.AlignRight)
+            label = QLabel(str(row + 1))
+            color = PROCESS_COLORS[row]
+            label.setStyleSheet("QLabel { background-color : " + color + "; }")
+            process_layout.addWidget(label, row + 1, 1)
+            ready_time_spinbox = create_spinbox(0, 49)
+            process_layout.addWidget(ready_time_spinbox, row + 1, 2)
+            exec_time_spinbox = create_spinbox(1, 49)
+            process_layout.addWidget(exec_time_spinbox, row + 1, 3)
+            deadline_spinbox = create_spinbox(1, 49)
+            process_layout.addWidget(deadline_spinbox, row + 1, 4)
+            self._ui['process_selection'].append((checkbox, ready_time_spinbox, exec_time_spinbox, deadline_spinbox))
 
         control_layout = QVBoxLayout()
         control_layout.addLayout(form_layout)
-        control_layout.addLayout(process_layout)
+        # control_layout.addLayout(process_layout)
         control_layout.addWidget(self._ui['init_sim_button'])
         control_layout.addWidget(self._ui['next_step_button'])
         control_layout.addWidget(self._ui['run_sim_button'])
@@ -178,6 +199,7 @@ class MainWindow(QMainWindow):
 
         lower_layout = QHBoxLayout()
         lower_layout.addWidget(self._ui['logger'])
+        lower_layout.addLayout(process_layout)
         lower_layout.addLayout(control_layout)
 
         central_layout = QVBoxLayout()
