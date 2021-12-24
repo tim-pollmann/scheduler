@@ -1,6 +1,6 @@
 import logging
 import copy
-from common import Process
+from process import Process
 from scheduler import NP_FCFS_Scheduler, NP_SJF_Scheduler, NP_EDF_Scheduler, NP_LLF_Scheduler, P_SJF_Scheduler, P_EDF_Scheduler, P_RR_Scheduler
 
 

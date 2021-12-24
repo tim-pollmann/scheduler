@@ -15,7 +15,7 @@ class CPU:
 
     @property
     def history(self):
-        return zip(self._timestamps, self._pids)
+        return self._timestamps, self._pids
 
     @property
     def has_process(self):

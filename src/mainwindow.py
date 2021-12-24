@@ -114,7 +114,7 @@ class MainWindow(QMainWindow):
         
         if self._scheduler is not None:
             for cpu in self._scheduler.cpus:
-                for timestamp, pid in cpu.history:
+                for timestamp, pid in zip(*cpu.history):
                     rectangle = Rectangle((timestamp, cpu.id - LINE_WIDTH / 2), 1, LINE_WIDTH, facecolor=PROCESS_COLORS[pid - 1])
                     self._graph_data.append(self._ui['graph_axes'].add_patch(rectangle))
 
