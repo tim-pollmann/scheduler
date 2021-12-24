@@ -42,7 +42,7 @@ class MainWindow(QMainWindow):
         self._graph_data = []
 
     def _init_sim_button_clicked(self):
-        n_cpus = [CPU(idx + 1) for idx in range(self._ui['n_cpus_selection'].value())]
+        cpus = [CPU(idx + 1) for idx in range(self._ui['n_cpus_selection'].value())]
 
         processes = [Process(idx + 1, ready_time_box.value(), exec_time_box.value(), deadline_box.value()) 
                     for idx, (checkbox, ready_time_box, exec_time_box, deadline_box)
@@ -51,20 +51,20 @@ class MainWindow(QMainWindow):
 
         match self._ui['strategy_selection'].currentIndex():
             case 0:
-                self._scheduler = NP_FCFS_Scheduler(n_cpus, processes)
+                self._scheduler = NP_FCFS_Scheduler(cpus, processes)
             case 1:
-                self._scheduler = NP_SJF_Scheduler(n_cpus, processes)
+                self._scheduler = NP_SJF_Scheduler(cpus, processes)
             case 2:
-                self._scheduler = NP_EDF_Scheduler(n_cpus, processes)
+                self._scheduler = NP_EDF_Scheduler(cpus, processes)
             case 3:
-                self._scheduler = NP_LLF_Scheduler(n_cpus, processes)
+                self._scheduler = NP_LLF_Scheduler(cpus, processes)
             case 4:
-                self._scheduler = P_SJF_Scheduler(processes)
+                self._scheduler = P_SJF_Scheduler(cpus, processes)
             case 5:
-                self._scheduler = P_EDF_Scheduler(processes)
+                self._scheduler = P_EDF_Scheduler(cpus, processes)
             case 6:
                 quantum = 3
-                self._scheduler = P_RR_Scheduler(processes, quantum)
+                self._scheduler = P_RR_Scheduler(cpus, processes, quantum)
 
         self._ui['init_sim_button'].setEnabled(False)
         self._ui['next_step_button'].setEnabled(True)
