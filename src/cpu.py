@@ -1,25 +1,19 @@
 class CPU:
-    def __init__(self, id):
-        self._id = id
+    def __init__(self, cid):
+        self._cid = cid
         self._current_process = None
-        self._timestamps = []
-        self._pids = []
 
     @property
-    def id(self):
-        return self._id
+    def cid(self):
+        return self._cid
 
     @property
     def current_process(self):
         return self._current_process
 
     @property
-    def history(self):
-        return self._timestamps, self._pids
-
-    @property
     def has_process(self):
-        if self._current_process == None:
+        if self._current_process is None:
             return False
         return True
 
@@ -29,13 +23,11 @@ class CPU:
             return True
         return False
 
-    def set_process(self, process):
+    def allocate_process(self, process):
         self._current_process = process
 
-    def unset_process(self):
+    def deallocate_process(self):
         self._current_process = None
 
-    def execute_process(self, timestamp):
+    def execute_process(self):
         self._current_process.exec_atomic_command()
-        self._timestamps.append(timestamp)
-        self._pids.append(self._current_process.id)
