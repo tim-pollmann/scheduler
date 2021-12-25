@@ -55,7 +55,8 @@ class MainWindow(QMainWindow):
                     self._scheduler = PEdfScheduler(cpus, processes)
                 case 6:
                     quantum = 3
-                    self._scheduler = PRrScheduler(cpus, processes, quantum)
+                    # we do not use the list cpus here, because "round robin"-schedulers have only one cpu to work with
+                    self._scheduler = PRrScheduler(CPU(1), processes, quantum)
 
             self._ui['init_sim_button'].setEnabled(False)
             self._ui['next_step_button'].setEnabled(True)

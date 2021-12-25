@@ -26,14 +26,19 @@ class Scheduler(ABC):
     def avg_delta_time(self):
         process_delta_times = {}
 
+        # search the maximum time-interval between the ready-time and the last occurrence in the allocation history
+        # for each process
+        # since the last occurrence must bethe finish time, this interval represents the delta for each process
         for timestamp, _, process in self._allocation_history:
             process_delta_times[process.pid] = max(timestamp - process.ready_time + 1,
                                                    process_delta_times.get(process.pid, -1))
 
         return sum(process_delta_times.values()) / len(process_delta_times)
 
-    # represents one cpu cycle
+    # represents one clock-cycle
     def step(self):
+        # one clock-cycle consists of the following 3 steps
+
         # 1. move processes, that got ready at the current time, from the blocked-list to the ready-list
         self._ready_processes.extend([p for p in self._blocked_processes if p.ready_time <= self._time])
         self._blocked_processes = [blocked_p for blocked_p in self._blocked_processes
@@ -42,7 +47,7 @@ class Scheduler(ABC):
         # 2. update process-allocation
         self._update_process_allocation()
 
-        # 3. execute all allocated processes
+        # 3. execute all allocated processes on their corresponding cpus
         for cpu in self._cpus:
             if cpu.has_process:
                 cpu.execute_process()
@@ -71,11 +76,13 @@ class Scheduler(ABC):
         self._log(f'Allocated process {process.pid} to CPU #{cpu.cid}')
 
     # updates the cpu allocation (different for nonpreemtive and preemptive schedulers)
+    # will be implemented by "NonPreemptiveScheduler" and "PreemptiveScheduler"
     @abstractmethod
     def _update_process_allocation(self):
         pass
 
     # sorts the processes based on the scheduler-strategy
+    # will be implemented by the ultimate schedulers
     @abstractstaticmethod
     def _sort_processes(process):
         pass
@@ -90,7 +97,6 @@ class NonPreemptiveScheduler(Scheduler, ABC):
         self._ready_processes.sort(key=self._sort_processes)
 
         for cpu in self._cpus:
-            # if a cpus process has finished
             if cpu.has_finished_process:
                 self._deallocate_finished_process(cpu)
 
@@ -118,18 +124,16 @@ class PreemptiveScheduler(Scheduler, ABC):
         not_allocated_candidates = set(candidates) - set(allocated_processes)
 
         for cpu in self._cpus:
-            # if a cpu has a finished process
             if cpu.has_finished_process:
                 self._deallocate_finished_process(cpu)
 
-            # if there are ready process
+            # if there are ready process available
             if self._ready_processes:
                 # if a cpu has a process and that process is not the best choice
                 if cpu.has_process and cpu.current_process not in candidates:
                     self._ready_processes.append(cpu.current_process)
                     cpu.deallocate_process()
 
-                # if a cpu has no process
                 if not cpu.has_process:
                     self._allocate_process(cpu, not_allocated_candidates.pop())
 
@@ -201,32 +205,35 @@ class PEdfScheduler(PreemptiveScheduler):
 
 
 # class for preemptive "round robin"-schedulers
+# this scheduler has only one cpu to work with
 class PRrScheduler(PreemptiveScheduler):
-    def __init__(self, cpus, processes, quantum):
+    def __init__(self, cpu, processes, quantum):
+        super().__init__([cpu], processes)
         self._quantum = quantum
         self._quantum_counter = 0
-        super().__init__(cpus, processes)
 
+    # since the "round robin"-scheduler is mainly different from the other preemptive schedulers, we override this
+    # function and implement the "round robin"-schedulers own logic in there
     def _update_process_allocation(self):
         cpu = self._cpus[0]
 
         if cpu.has_finished_process:
-            self._quantum_counter = 0
             self._deallocate_finished_process(cpu)
 
         if self._ready_processes:
-            if self._quantum_counter == self._quantum:
-                self._quantum_counter = 0
-                if cpu.has_process:
-                    self._ready_processes.append(cpu.current_process)
-                    cpu.deallocate_process()
+            if self._quantum_counter >= self._quantum and cpu.has_process:
+                self._ready_processes.append(cpu.current_process)
+                cpu.deallocate_process()
 
             # if a cpu has no process
             if not cpu.has_process:
+                self._quantum_counter = 0
                 self._allocate_process(cpu, self._ready_processes[0])
 
         self._quantum_counter += 1
 
     @staticmethod
     def _sort_processes(process):
+        # since we override _update_process_allocation() and we do not use this function there, there is no need to
+        # properly implement this function
         pass
