@@ -12,7 +12,9 @@ from scheduler import (NpFcfsScheduler, NpSjfScheduler, NpEdfScheduler, NpLlfSch
                        PEdfScheduler, PRrScheduler)
 
 MAX_CPUS = 4
-MAX_TIME = 100
+MAX_SIM_TIME = 100
+MAX_QUANTUM = 10
+
 LINE_WIDTH = 0.2
 PROCESS_COLORS = ['red', 'blue', 'green', 'yellow', 'magenta', 'grey', 'cyan', 'chocolate', 'blueviolet', 'brown',
                   'darkred', 'salmon', 'gold', 'khaki', 'hotpink', 'limegreen', 'lightblue', 'navy', 'olive', 'orange']
@@ -54,7 +56,8 @@ class MainWindow(QMainWindow):
                 case 5:
                     self._scheduler = PEdfScheduler(cpus, processes)
                 case 6:
-                    quantum = 3
+                    quantum = self._ui['quantum_selection'].value()
+
                     # we do not use the list cpus here, because "round robin"-schedulers have only one cpu to work with
                     self._scheduler = PRrScheduler(CPU(1), processes, quantum)
 
@@ -112,98 +115,113 @@ class MainWindow(QMainWindow):
 
         self._ui['graph_canvas'].draw_idle()
 
+    # init the matplotlib-graph
     def _init_mpl(self):
         fig = Figure()
-        self._ui['graph_axes'] = fig.add_subplot(111)
-        self._ui['graph_axes'].set_ylabel('CPUs')
-        self._ui['graph_axes'].set_xlabel('Time')
-        self._ui['graph_axes'].xaxis.tick_top()
+        self._ui['graph_canvas'] = FigureCanvasQTAgg(fig)
+        self._ui['graph_axes'] = fig.add_subplot()
+
         self._ui['graph_axes'].xaxis.set_label_position('top')
-        self._ui['graph_axes'].set_xlim(0, MAX_TIME)
+        self._ui['graph_axes'].set_xlabel('Time')
+        self._ui['graph_axes'].set_ylabel('CPUs')
+
+        self._ui['graph_axes'].set_xlim(0, MAX_SIM_TIME)
         self._ui['graph_axes'].set_ylim(0.5, MAX_CPUS + 0.5)
-        self._ui['graph_axes'].set_xticks(np.arange(0, MAX_TIME + 1, 5))
-        self._ui['graph_axes'].set_xticks(np.arange(0, MAX_TIME + 1, 1), minor=True)
+
+        self._ui['graph_axes'].xaxis.tick_top()
+        self._ui['graph_axes'].set_xticks(np.arange(0, MAX_SIM_TIME + 1, 5))
+        self._ui['graph_axes'].set_xticks(np.arange(0, MAX_SIM_TIME + 1, 1), minor=True)
         self._ui['graph_axes'].set_yticks(np.arange(1, MAX_CPUS + 1, 1))
+
         self._ui['graph_axes'].grid(axis='x', which='major', alpha=0.7)
         self._ui['graph_axes'].grid(axis='x', which='minor', alpha=0.35)
-        self._ui['graph_canvas'] = FigureCanvasQTAgg(fig)
 
+    # init the qt-ui
+    # not the most elegant solution but it does its job :)
     def _init_qt(self):
         def create_spinbox(min_value, max_value):
             spinbox = QSpinBox()
             spinbox.setRange(min_value, max_value)
             return spinbox
 
+        def create_button(text, onclick, enabled=True):
+            button = QPushButton(text)
+            button.clicked.connect(onclick)
+            button.setEnabled(enabled)
+            return button
+
+        # bottom left ui
         self._ui['logger'] = QLabel('')
         self._ui['logger'].setAlignment(Qt.AlignmentFlag.AlignBottom)
 
-        self._ui['strategy_selection'] = QComboBox()
-        self._ui['strategy_selection'].addItems(STRATEGIES)
-
-        self._ui['n_cpus_selection'] = create_spinbox(1, MAX_CPUS)
-
-        form_layout = QFormLayout()
-        form_layout.addRow(QLabel('Scheduler-Strategy'), self._ui['strategy_selection'])
-        form_layout.addRow(QLabel('Number of CPUs'), self._ui['n_cpus_selection'])
-
-        self._ui['init_sim_button'] = QPushButton('Initialize Simulation')
-        self._ui['init_sim_button'].clicked.connect(self._init_sim_button_clicked)
-        self._ui['next_step_button'] = QPushButton('Do Next Simulation Step')
-        self._ui['next_step_button'].clicked.connect(self._next_step_button_clicked)
-        self._ui['next_step_button'].setEnabled(False)
-        self._ui['run_sim_button'] = QPushButton('Run Complete Simulation')
-        self._ui['run_sim_button'].clicked.connect(self._run_sim_button_clicked)
-        self._ui['run_sim_button'].setEnabled(False)
-        self._ui['reset_sim_button'] = QPushButton('Reset Simulation')
-        self._ui['reset_sim_button'].clicked.connect(self._reset_sim_button_clicked)
-        self._ui['reset_sim_button'].setEnabled(False)
-
-        process_layout = QGridLayout()
-        process_layout.addWidget(QLabel('PID'), 0, 1)
-        process_layout.addWidget(QLabel('Ready Time'), 0, 2)
-        process_layout.addWidget(QLabel('Execution Time'), 0, 3)
-        process_layout.addWidget(QLabel('Deadline'), 0, 4)
+        # bottom center ui
+        middle_layout = QGridLayout()
+        middle_layout.addWidget(QLabel('PID'), 0, 1)
+        middle_layout.addWidget(QLabel('Ready Time'), 0, 2)
+        middle_layout.addWidget(QLabel('Execution Time'), 0, 3)
+        middle_layout.addWidget(QLabel('Deadline'), 0, 4)
 
         self._ui['process_selection'] = []
 
         for row in range(len(PROCESS_COLORS)):
             checkbox = QCheckBox()
-            process_layout.addWidget(checkbox, row + 1, 0, Qt.AlignmentFlag.AlignRight)
+            middle_layout.addWidget(checkbox, row + 1, 0, Qt.AlignmentFlag.AlignRight)
 
             label = QLabel(str(row + 1))
             color = PROCESS_COLORS[row]
             label.setStyleSheet("QLabel { background-color : " + color + "; }")
-            process_layout.addWidget(label, row + 1, 1)
+            middle_layout.addWidget(label, row + 1, 1)
 
-            ready_time_spinbox = create_spinbox(0, 49)
-            process_layout.addWidget(ready_time_spinbox, row + 1, 2)
+            ready_time_spinbox = create_spinbox(0, MAX_SIM_TIME // 2)
+            middle_layout.addWidget(ready_time_spinbox, row + 1, 2)
 
-            exec_time_spinbox = create_spinbox(1, 49)
-            process_layout.addWidget(exec_time_spinbox, row + 1, 3)
+            exec_time_spinbox = create_spinbox(1, MAX_SIM_TIME // 2)
+            middle_layout.addWidget(exec_time_spinbox, row + 1, 3)
 
-            deadline_spinbox = create_spinbox(1, 49)
-            process_layout.addWidget(deadline_spinbox, row + 1, 4)
+            deadline_spinbox = create_spinbox(1, MAX_SIM_TIME)
+            middle_layout.addWidget(deadline_spinbox, row + 1, 4)
 
             self._ui['process_selection'].append((checkbox, ready_time_spinbox, exec_time_spinbox, deadline_spinbox))
 
-        control_layout = QVBoxLayout()
-        control_layout.addLayout(form_layout)
-        control_layout.addWidget(self._ui['init_sim_button'])
-        control_layout.addWidget(self._ui['next_step_button'])
-        control_layout.addWidget(self._ui['run_sim_button'])
-        control_layout.addWidget(self._ui['reset_sim_button'])
+        # bottom right ui
+        right_layout = QVBoxLayout()
 
+        configuration_layout = QFormLayout()
+        self._ui['strategy_selection'] = QComboBox()
+        self._ui['strategy_selection'].addItems(STRATEGIES)
+        configuration_layout.addRow(QLabel('Scheduler-Strategy'), self._ui['strategy_selection'])
+
+        self._ui['n_cpus_selection'] = create_spinbox(1, MAX_CPUS)
+        configuration_layout.addRow(QLabel('Number of CPUs (except "Round Robin"-Schedulers")'),
+                                    self._ui['n_cpus_selection'])
+
+        self._ui['quantum_selection'] = create_spinbox(1, MAX_QUANTUM)
+        configuration_layout.addRow(QLabel('Quantum (only for "Round Robin"-Schedulers")'),
+                                    self._ui['quantum_selection'])
+        right_layout.addLayout(configuration_layout)
+
+        self._ui['init_sim_button'] = create_button('Initialize Simulation', self._init_sim_button_clicked)
+        right_layout.addWidget(self._ui['init_sim_button'])
+        self._ui['next_step_button'] = create_button('Do Next Simulation Step', self._next_step_button_clicked, False)
+        right_layout.addWidget(self._ui['next_step_button'])
+        self._ui['run_sim_button'] = create_button('Run Complete Simulation', self._run_sim_button_clicked, False)
+        right_layout.addWidget(self._ui['run_sim_button'])
+        self._ui['reset_sim_button'] = create_button('Reset Simulation', self._reset_sim_button_clicked, False)
+        right_layout.addWidget(self._ui['reset_sim_button'])
+
+        # whole bottom ui
         lower_layout = QHBoxLayout()
         lower_layout.addWidget(self._ui['logger'])
-        lower_layout.addLayout(process_layout)
-        lower_layout.addLayout(control_layout)
+        lower_layout.addLayout(middle_layout)
+        lower_layout.addLayout(right_layout)
 
-        central_layout = QVBoxLayout()
-        central_layout.addWidget(self._ui['graph_canvas'])
-        central_layout.addLayout(lower_layout)
+        # complete ui
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self._ui['graph_canvas'])
+        main_layout.addLayout(lower_layout)
 
         central_widget = QWidget()
-        central_widget.setLayout(central_layout)
+        central_widget.setLayout(main_layout)
 
         self.setWindowTitle('Scheduler & Process Simulator')
         self.setCentralWidget(central_widget)
