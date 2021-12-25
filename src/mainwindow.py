@@ -39,27 +39,28 @@ class MainWindow(QMainWindow):
                      in enumerate(self._ui['process_selection'])
                      if checkbox.isChecked()]
 
-        match self._ui['strategy_selection'].currentIndex():
-            case 0:
-                self._scheduler = NpFcfsScheduler(cpus, processes)
-            case 1:
-                self._scheduler = NpSjfScheduler(cpus, processes)
-            case 2:
-                self._scheduler = NpEdfScheduler(cpus, processes)
-            case 3:
-                self._scheduler = NpLlfScheduler(cpus, processes)
-            case 4:
-                self._scheduler = PSjfScheduler(cpus, processes)
-            case 5:
-                self._scheduler = PEdfScheduler(cpus, processes)
-            case 6:
-                quantum = 3
-                self._scheduler = PRrScheduler(cpus, processes, quantum)
+        if processes:
+            match self._ui['strategy_selection'].currentIndex():
+                case 0:
+                    self._scheduler = NpFcfsScheduler(cpus, processes)
+                case 1:
+                    self._scheduler = NpSjfScheduler(cpus, processes)
+                case 2:
+                    self._scheduler = NpEdfScheduler(cpus, processes)
+                case 3:
+                    self._scheduler = NpLlfScheduler(cpus, processes)
+                case 4:
+                    self._scheduler = PSjfScheduler(cpus, processes)
+                case 5:
+                    self._scheduler = PEdfScheduler(cpus, processes)
+                case 6:
+                    quantum = 3
+                    self._scheduler = PRrScheduler(cpus, processes, quantum)
 
-        self._ui['init_sim_button'].setEnabled(False)
-        self._ui['next_step_button'].setEnabled(True)
-        self._ui['run_sim_button'].setEnabled(True)
-        self._ui['reset_sim_button'].setEnabled(True)
+            self._ui['init_sim_button'].setEnabled(False)
+            self._ui['next_step_button'].setEnabled(True)
+            self._ui['run_sim_button'].setEnabled(True)
+            self._ui['reset_sim_button'].setEnabled(True)
 
     def _next_step_button_clicked(self):
         if not self._scheduler.step():
@@ -103,10 +104,10 @@ class MainWindow(QMainWindow):
         self._graph_data = []
 
         if self._scheduler is not None:
-            for timestamp, cid, pid in self._scheduler.allocation_history:
+            for timestamp, cid, process in self._scheduler.allocation_history:
                 self._graph_data.append(
                     self._ui['graph_axes'].add_patch(Rectangle((timestamp, cid - LINE_WIDTH / 2), 1, LINE_WIDTH,
-                                                               facecolor=PROCESS_COLORS[pid - 1])))
+                                                               facecolor=PROCESS_COLORS[process.pid - 1])))
 
         self._ui['graph_canvas'].draw_idle()
 

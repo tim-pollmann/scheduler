@@ -9,11 +9,10 @@ class Scheduler(ABC):
         self._blocked_processes = processes
         self._ready_processes = []
 
-        self._finish_times = []
         self._time = 0
         self._logger = ''
 
-        # contents tuples of format (timestamp, cpu.cid, process.pid)
+        # contents tuples of format (timestamp, cpu.cid, process)
         self._allocation_history = []
 
     @property
@@ -24,15 +23,21 @@ class Scheduler(ABC):
     def logger(self):
         return self._logger
 
-    def avg_time(self):
-        return sum(self._finish_times) / len(self._finish_times)
+    def avg_delta_time(self):
+        process_delta_times = {}
+
+        for timestamp, _, process in self._allocation_history:
+            process_delta_times[process.pid] = max(timestamp - process.ready_time + 1,
+                                                   process_delta_times.get(process.pid, -1))
+
+        return sum(process_delta_times.values()) / len(process_delta_times)
 
     # represents one cpu cycle
     def step(self):
         # 1. move processes, that got ready at the current time, from the blocked-list to the ready-list
         self._ready_processes.extend([p for p in self._blocked_processes if p.ready_time <= self._time])
-        self._blocked_processes = [blocked_p for blocked_p in self._blocked_processes if
-                                   blocked_p not in self._ready_processes]
+        self._blocked_processes = [blocked_p for blocked_p in self._blocked_processes
+                                   if blocked_p not in self._ready_processes]
 
         # 2. update process-allocation
         self._update_process_allocation()
@@ -41,12 +46,13 @@ class Scheduler(ABC):
         for cpu in self._cpus:
             if cpu.has_process:
                 cpu.execute_process()
+                self._allocation_history.append((self._time, cpu.cid, cpu.current_process))
 
         # if there are no more ready, blocked or allocated processes we are finished
         if len(self._ready_processes) + len(self._blocked_processes) + len(
                 [None for cpu in self._cpus if cpu.has_process]) == 0:
             self._log('Finished all processes')
-            self._log(f'Average ready time was {self.avg_time()}')
+            self._log(f'Average ready time was {self.avg_delta_time()}')
             return False
 
         self._time += 1
@@ -58,12 +64,10 @@ class Scheduler(ABC):
     def _deallocate_finished_process(self, cpu):
         self._log(f'Finished process {cpu.current_process.pid}')
         cpu.deallocate_process()
-        self._finish_times.append(self._time)
 
     def _allocate_process(self, cpu, process):
         self._ready_processes.remove(process)
         cpu.allocate_process(process)
-        self._allocation_history.append((self._time, cpu.cid, process.pid))
         self._log(f'Allocated process {process.pid} to CPU #{cpu.cid}')
 
     # updates the cpu allocation (different for nonpreemtive and preemptive schedulers)
@@ -176,8 +180,8 @@ class NpLlfScheduler(NonPreemptiveScheduler):
 
 # class for preemptive "shortest job first"-schedulers
 class PSjfScheduler(PreemptiveScheduler):
-    def __init__(self, cpu, processes):
-        super().__init__(cpu, processes)
+    def __init__(self, cpus, processes):
+        super().__init__(cpus, processes)
 
     @staticmethod
     def _sort_processes(process):
@@ -187,8 +191,8 @@ class PSjfScheduler(PreemptiveScheduler):
 
 # class for preemptive "earliest deadline first"-schedulers
 class PEdfScheduler(PreemptiveScheduler):
-    def __init__(self, cpu, processes):
-        super().__init__(cpu, processes)
+    def __init__(self, cpus, processes):
+        super().__init__(cpus, processes)
 
     @staticmethod
     def _sort_processes(process):
@@ -198,13 +202,31 @@ class PEdfScheduler(PreemptiveScheduler):
 
 # class for preemptive "round robin"-schedulers
 class PRrScheduler(PreemptiveScheduler):
-    def __init__(self, cpu, processes, quantum):
+    def __init__(self, cpus, processes, quantum):
         self._quantum = quantum
-        self._quantum_counter = -1
-        self._current_index = -1
-        self._last_process = None
-        super().__init__(cpu, processes)
+        self._quantum_counter = 0
+        super().__init__(cpus, processes)
+
+    def _update_process_allocation(self):
+        cpu = self._cpus[0]
+
+        if cpu.has_finished_process:
+            self._quantum_counter = 0
+            self._deallocate_finished_process(cpu)
+
+        if self._ready_processes:
+            if self._quantum_counter == self._quantum:
+                self._quantum_counter = 0
+                if cpu.has_process:
+                    self._ready_processes.append(cpu.current_process)
+                    cpu.deallocate_process()
+
+            # if a cpu has no process
+            if not cpu.has_process:
+                self._allocate_process(cpu, self._ready_processes[0])
+
+        self._quantum_counter += 1
 
     @staticmethod
-    def _sort_processes(self):
+    def _sort_processes(process):
         pass
