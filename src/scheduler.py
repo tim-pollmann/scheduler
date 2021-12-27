@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod, abstractstaticmethod
+from cpu import CPU
 
 
 # base class for all schedulers
 class Scheduler(ABC):
-    def __init__(self, cpus, processes):
-        self._cpus = cpus
+    def __init__(self, n_cpus, processes):
+        self._cpus = [CPU(idx + 1) for idx in range(n_cpus)]
 
         self._blocked_processes = processes
         self._ready_processes = []
@@ -87,8 +88,8 @@ class Scheduler(ABC):
 
 # base class for all nonpreemptive schedulers
 class NonPreemptiveScheduler(Scheduler, ABC):
-    def __init__(self, cpus, processes):
-        super().__init__(cpus, processes)
+    def __init__(self, n_cpus, processes):
+        super().__init__(n_cpus, processes)
 
     def _update_process_allocation(self):
         self._ready_processes.sort(key=self._sort_processes)
@@ -104,8 +105,8 @@ class NonPreemptiveScheduler(Scheduler, ABC):
 
 # base class for all nonpreemptive schedulers
 class PreemptiveScheduler(Scheduler, ABC):
-    def __init__(self, cpu, processes):
-        super().__init__(cpu, processes)
+    def __init__(self, n_cpus, processes):
+        super().__init__(n_cpus, processes)
 
     def _update_process_allocation(self):
         # currently allocated processes
@@ -126,7 +127,7 @@ class PreemptiveScheduler(Scheduler, ABC):
 
             # if there are ready process available
             if self._ready_processes:
-                # if a cpu has a process and that process is not the best choice
+                # if a cpu has a process but there are better candidates
                 if cpu.has_process and cpu.current_process not in candidates:
                     self._deallocate_process(cpu)
 
@@ -136,8 +137,8 @@ class PreemptiveScheduler(Scheduler, ABC):
 
 # class for nonpreemptive "first come first served"-schedulers
 class NpFcfsScheduler(NonPreemptiveScheduler):
-    def __init__(self, cpus, processes):
-        super().__init__(cpus, processes)
+    def __init__(self, n_cpus, processes):
+        super().__init__(n_cpus, processes)
 
     @staticmethod
     def _sort_processes(process):
@@ -147,8 +148,8 @@ class NpFcfsScheduler(NonPreemptiveScheduler):
 
 # class for nonpreemptive "shortest job first"-schedulers
 class NpSjfScheduler(NonPreemptiveScheduler):
-    def __init__(self, cpus, processes):
-        super().__init__(cpus, processes)
+    def __init__(self, n_cpus, processes):
+        super().__init__(n_cpus, processes)
 
     @staticmethod
     def _sort_processes(process):
@@ -158,8 +159,8 @@ class NpSjfScheduler(NonPreemptiveScheduler):
 
 # class for nonpreemptive "earliest deadline first"-schedulers
 class NpEdfScheduler(NonPreemptiveScheduler):
-    def __init__(self, cpus, processes):
-        super().__init__(cpus, processes)
+    def __init__(self, n_cpus, processes):
+        super().__init__(n_cpus, processes)
 
     @staticmethod
     def _sort_processes(process):
@@ -169,8 +170,8 @@ class NpEdfScheduler(NonPreemptiveScheduler):
 
 # class for nonpreemptive "least laxity first"-schedulers
 class NpLlfScheduler(NonPreemptiveScheduler):
-    def __init__(self, cpus, processes):
-        super().__init__(cpus, processes)
+    def __init__(self, n_cpus, processes):
+        super().__init__(n_cpus, processes)
 
     @staticmethod
     def _sort_processes(process):
@@ -180,8 +181,8 @@ class NpLlfScheduler(NonPreemptiveScheduler):
 
 # class for preemptive "shortest job first"-schedulers
 class PSjfScheduler(PreemptiveScheduler):
-    def __init__(self, cpus, processes):
-        super().__init__(cpus, processes)
+    def __init__(self, n_cpus, processes):
+        super().__init__(n_cpus, processes)
 
     @staticmethod
     def _sort_processes(process):
@@ -191,8 +192,8 @@ class PSjfScheduler(PreemptiveScheduler):
 
 # class for preemptive "earliest deadline first"-schedulers
 class PEdfScheduler(PreemptiveScheduler):
-    def __init__(self, cpus, processes):
-        super().__init__(cpus, processes)
+    def __init__(self, n_cpus, processes):
+        super().__init__(n_cpus, processes)
 
     @staticmethod
     def _sort_processes(process):
@@ -203,8 +204,8 @@ class PEdfScheduler(PreemptiveScheduler):
 # class for preemptive "round robin"-schedulers
 # this scheduler has only one cpu to work with
 class PRrScheduler(PreemptiveScheduler):
-    def __init__(self, cpu, processes, quantum):
-        super().__init__([cpu], processes)
+    def __init__(self, processes, quantum):
+        super().__init__(1, processes)
         self._quantum = quantum
         self._quantum_counter = 0
 

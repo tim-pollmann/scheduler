@@ -5,16 +5,14 @@ from matplotlib.patches import Rectangle
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QMainWindow, QGridLayout, QFormLayout, QSpinBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QComboBox, QPushButton, QCheckBox)
-
-from cpu import CPU
 from process import Process
 from scheduler import (NpFcfsScheduler, NpSjfScheduler, NpEdfScheduler, NpLlfScheduler, PSjfScheduler, PEdfScheduler,
                        PRrScheduler)
 
+
 MAX_CPUS = 4
 MAX_SIM_TIME = 100
 MAX_QUANTUM = 10
-
 LINE_WIDTH = 0.2
 PROCESS_COLORS = ['red', 'blue', 'green', 'yellow', 'magenta', 'grey', 'cyan', 'chocolate', 'blueviolet', 'brown',
                   'darkred', 'salmon', 'gold', 'khaki', 'hotpink', 'limegreen', 'lightblue', 'navy', 'olive', 'orange']
@@ -34,7 +32,7 @@ class MainWindow(QMainWindow):
         self._graph_data = []
 
     def _init_sim_button_clicked(self):
-        cpus = [CPU(idx + 1) for idx in range(self._ui['n_cpus_selection'].value())]
+        n_cpus = (self._ui['n_cpus_selection'].value())
 
         processes = [Process(idx + 1, ready_time_box.value(), exec_time_box.value(), deadline_box.value())
                      for idx, (checkbox, ready_time_box, exec_time_box, deadline_box)
@@ -44,22 +42,19 @@ class MainWindow(QMainWindow):
         if processes:
             match self._ui['strategy_selection'].currentIndex():
                 case 0:
-                    self._scheduler = NpFcfsScheduler(cpus, processes)
+                    self._scheduler = NpFcfsScheduler(n_cpus, processes)
                 case 1:
-                    self._scheduler = NpSjfScheduler(cpus, processes)
+                    self._scheduler = NpSjfScheduler(n_cpus, processes)
                 case 2:
-                    self._scheduler = NpEdfScheduler(cpus, processes)
+                    self._scheduler = NpEdfScheduler(n_cpus, processes)
                 case 3:
-                    self._scheduler = NpLlfScheduler(cpus, processes)
+                    self._scheduler = NpLlfScheduler(n_cpus, processes)
                 case 4:
-                    self._scheduler = PSjfScheduler(cpus, processes)
+                    self._scheduler = PSjfScheduler(n_cpus, processes)
                 case 5:
-                    self._scheduler = PEdfScheduler(cpus, processes)
+                    self._scheduler = PEdfScheduler(n_cpus, processes)
                 case 6:
-                    quantum = self._ui['quantum_selection'].value()
-
-                    # we do not use the list cpus here, because "round robin"-schedulers have only one cpu to work with
-                    self._scheduler = PRrScheduler(CPU(1), processes, quantum)
+                    self._scheduler = PRrScheduler(processes, self._ui['quantum_selection'].value())
 
             self._ui['init_sim_button'].setEnabled(False)
             self._ui['next_step_button'].setEnabled(True)
