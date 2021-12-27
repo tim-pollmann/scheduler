@@ -1,11 +1,11 @@
 class CPU:
-    def __init__(self, cid):
-        self._cid = cid
+    def __init__(self, id):
+        self._id = id
         self._current_process = None
 
     @property
-    def cid(self):
-        return self._cid
+    def id(self):
+        return self._id
 
     @property
     def current_process(self):

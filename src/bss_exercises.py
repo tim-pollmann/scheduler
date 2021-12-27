@@ -1,13 +1,6 @@
 from process import Process
-from scheduler import (
-    NpFcfsScheduler,
-    NpSjfScheduler,
-    NpEdfScheduler,
-    NpLlfScheduler,
-    PSjfScheduler,
-    PEdfScheduler,
-    PRrScheduler
-)
+from scheduler import (NpFcfsScheduler, NpSjfScheduler, NpEdfScheduler, NpLlfScheduler, PSjfScheduler, PEdfScheduler,
+                       PRrScheduler)
 
 
 def exercise2():

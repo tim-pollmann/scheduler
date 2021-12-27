@@ -3,13 +3,13 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QMainWindow, QGridLayout, QFormLayout, QSpinBox, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox, QPushButton, QCheckBox)
+from PyQt5.QtWidgets import (QMainWindow, QGridLayout, QFormLayout, QSpinBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+                             QComboBox, QPushButton, QCheckBox)
 
 from cpu import CPU
 from process import Process
-from scheduler import (NpFcfsScheduler, NpSjfScheduler, NpEdfScheduler, NpLlfScheduler, PSjfScheduler,
-                       PEdfScheduler, PRrScheduler)
+from scheduler import (NpFcfsScheduler, NpSjfScheduler, NpEdfScheduler, NpLlfScheduler, PSjfScheduler, PEdfScheduler,
+                       PRrScheduler)
 
 MAX_CPUS = 4
 MAX_SIM_TIME = 100
@@ -76,13 +76,12 @@ class MainWindow(QMainWindow):
 
     def _run_sim_button_clicked(self):
         while self._scheduler.step():
-            pass
+            self._update_graph()
+
+        self._update_logger()
 
         self._ui['next_step_button'].setEnabled(False)
         self._ui['run_sim_button'].setEnabled(False)
-
-        self._update_graph()
-        self._update_logger()
 
     def _reset_sim_button_clicked(self):
         self._ui['init_sim_button'].setEnabled(True)
@@ -102,16 +101,16 @@ class MainWindow(QMainWindow):
             self._ui['logger'].setText('')
 
     def _update_graph(self):
-        for item in self._graph_data:
-            item.remove()
-
-        self._graph_data = []
-
         if self._scheduler is not None:
-            for timestamp, cid, process in self._scheduler.allocation_history:
+            for timestamp, cid, pid in self._scheduler.last_allocation:
                 self._graph_data.append(
                     self._ui['graph_axes'].add_patch(Rectangle((timestamp, cid - LINE_WIDTH / 2), 1, LINE_WIDTH,
-                                                               facecolor=PROCESS_COLORS[process.pid - 1])))
+                                                               facecolor=PROCESS_COLORS[pid - 1])))
+        else:
+            for item in self._graph_data:
+                item.remove()
+
+            self._graph_data = []
 
         self._ui['graph_canvas'].draw_idle()
 

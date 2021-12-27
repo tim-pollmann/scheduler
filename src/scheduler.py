@@ -12,28 +12,21 @@ class Scheduler(ABC):
         self._time = 0
         self._logger = ''
 
-        # contents tuples of format (timestamp, cpu.cid, process)
-        self._allocation_history = []
+        # elapsed times between the timestamp the process got ready and the timestamp it finished
+        self._delta_times = []
 
+    # returns the current cpu allocation for each cpu as tuple of (timestamp, cpu.id, process.id)
     @property
-    def allocation_history(self):
-        return self._allocation_history
+    def last_allocation(self):
+        return [(self._time - 1, cpu.id, cpu.current_process.id) for cpu in self._cpus if cpu.has_process]
 
     @property
     def logger(self):
         return self._logger
 
+    @property
     def avg_delta_time(self):
-        process_delta_times = {}
-
-        # search the maximum time-interval between the ready-time and the last occurrence in the allocation history
-        # for each process
-        # since the last occurrence must bethe finish time, this interval represents the delta for each process
-        for timestamp, _, process in self._allocation_history:
-            process_delta_times[process.pid] = max(timestamp - process.ready_time + 1,
-                                                   process_delta_times.get(process.pid, -1))
-
-        return sum(process_delta_times.values()) / len(process_delta_times)
+        return sum(self._delta_times) / len(self._delta_times)
 
     # represents one clock-cycle
     def step(self):
@@ -51,13 +44,12 @@ class Scheduler(ABC):
         for cpu in self._cpus:
             if cpu.has_process:
                 cpu.execute_process()
-                self._allocation_history.append((self._time, cpu.cid, cpu.current_process))
 
         # if there are no more ready, blocked or allocated processes we are finished
         if len(self._ready_processes) + len(self._blocked_processes) + len(
                 [None for cpu in self._cpus if cpu.has_process]) == 0:
             self._log('Finished all processes')
-            self._log(f'Average ready time was {self.avg_delta_time()}')
+            self._log(f'Average ready time was {self.avg_delta_time}')
             return False
 
         self._time += 1
@@ -66,14 +58,19 @@ class Scheduler(ABC):
     def _log(self, text):
         self._logger += '\n [TIME = ' + "{:2.0f}".format(self._time) + '] ' + text
 
-    def _deallocate_finished_process(self, cpu):
-        self._log(f'Finished process {cpu.current_process.pid}')
-        cpu.deallocate_process()
-
     def _allocate_process(self, cpu, process):
         self._ready_processes.remove(process)
         cpu.allocate_process(process)
-        self._log(f'Allocated process {process.pid} to CPU #{cpu.cid}')
+        self._log(f'Allocated process {process.id} to CPU #{cpu.id}')
+
+    def _deallocate_process(self, cpu):
+        self._ready_processes.append(cpu.current_process)
+        cpu.deallocate_process()
+
+    def _deallocate_finished_process(self, cpu):
+        self._log(f'Finished process {cpu.current_process.id}')
+        self._delta_times.append(self._time - cpu.current_process.ready_time)
+        cpu.deallocate_process()
 
     # updates the cpu allocation (different for nonpreemtive and preemptive schedulers)
     # will be implemented by "NonPreemptiveScheduler" and "PreemptiveScheduler"
@@ -131,8 +128,7 @@ class PreemptiveScheduler(Scheduler, ABC):
             if self._ready_processes:
                 # if a cpu has a process and that process is not the best choice
                 if cpu.has_process and cpu.current_process not in candidates:
-                    self._ready_processes.append(cpu.current_process)
-                    cpu.deallocate_process()
+                    self._deallocate_process(cpu)
 
                 if not cpu.has_process:
                     self._allocate_process(cpu, not_allocated_candidates.pop())
