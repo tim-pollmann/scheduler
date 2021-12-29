@@ -1,50 +1,41 @@
 import numpy as np
+import os
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (QMainWindow, QGridLayout, QFormLayout, QSpinBox, QWidget, QVBoxLayout, QLayout, QLabel,
-                             QComboBox, QPushButton, QCheckBox, QSizePolicy)
+from PyQt5.QtWidgets import (QMainWindow, QLayout, QGridLayout, QFormLayout, QVBoxLayout, QWidget, QSpinBox, QLabel,
+                             QComboBox, QPushButton, QCheckBox)
 from process import Process
 from scheduler import (NpFcfsScheduler, NpSjfScheduler, NpEdfScheduler, NpLlfScheduler, PSjfScheduler, PEdfScheduler,
-                       PRrScheduler)
+                       PLlfScheduler, PRrScheduler)
+from bss_exercises import BSS_EXAMPLES
 
 MAX_CPUS = 4
 MAX_SIM_TIME = 100
 MAX_QUANTUM = 10
 LINE_WIDTH = 0.2
+
 PROCESS_COLORS = [
     'red', 'blue', 'green', 'yellow', 'magenta', 'grey', 'cyan', 'chocolate', 'blueviolet', 'brown', 'darkred',
-    'salmon', 'gold', 'khaki', 'hotpink', 'limegreen', 'lightblue', 'navy', 'olive', 'orange', 'lightgray', 'darkgreen'
+    'salmon', 'gold', 'khaki', 'hotpink', 'limegreen', 'lightblue', 'navy', 'olive', 'orange',
+    # 'lightgray', 'darkgreen'
 ]
 
-STRATEGIES = [
+SCHEDULERS = [
     'First Come First Serve (nonpreemptive)', 'Shortest Job First (nonpreemptive)',
     'Earliest Deadline First (nonpreemptive)', 'Least Laxity First (nonpreemptive)', 'Shortest Job First (preemptive)',
-    'Earliest Deadline First (preemptive)', 'Round Robin (preemptive)'
-]
-
-DEFAULT_VALUES = [
-    # example 1 for FCFS, SJF, RR
-    (0, 22, 0), (0, 2, 0), (0, 3, 0), (0, 5, 0), (0, 8, 0),
-    # example 2 for FCFS, SJF, RR
-    (0, 22, 0), (0, 2, 0), (4, 3, 0), (4, 5, 0), (4, 8, 0),
-    # example 3 for FCFS, SJF, RR
-    (0, 15, 0), (0, 7, 0), (0, 1, 0), (0, 4, 0), (0, 8, 0),
-    # example 1 for EDF, LLF
-    (0, 4, 9), (0, 5, 9), (0, 8, 10),
-    # example 2 for EDF, LLF
-    (0, 4, 5), (0, 1, 7), (0, 2, 7), (0, 5, 13),
+    'Earliest Deadline First (preemptive)', 'Least Laxity First (preemptive)', 'Round Robin (preemptive)'
 ]
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, set_default_values_for_exercise_1=False):
+    def __init__(self, set_bss_examples=False):
         super().__init__()
         self._ui = {}
         self._init_mpl()
-        self._init_qt(set_default_values_for_exercise_1)
+        self._init_qt(set_bss_examples)
 
         self._scheduler = None
         self._graph_data = []
@@ -72,6 +63,8 @@ class MainWindow(QMainWindow):
                 case 5:
                     self._scheduler = PEdfScheduler(n_cpus, processes)
                 case 6:
+                    self._scheduler = PLlfScheduler(n_cpus, processes)
+                case 7:
                     self._scheduler = PRrScheduler(processes, self._ui['quantum_selection'].value())
 
             self._ui['init_sim_button'].setEnabled(False)
@@ -108,7 +101,6 @@ class MainWindow(QMainWindow):
         self._update_logger()
 
     def _update_logger(self):
-        print( self._ui['logger'].size())
         if self._scheduler is not None:
             self._ui['logger'].setText(self._scheduler.logger)
         else:
@@ -152,7 +144,7 @@ class MainWindow(QMainWindow):
 
     # init the qt-ui
     # not the most elegant solution but it does its job :)
-    def _init_qt(self, set_default_values_for_exercise_1):
+    def _init_qt(self, set_bss_examples):
         def create_spinbox(min_value, max_value):
             spinbox = QSpinBox()
             spinbox.setRange(min_value, max_value)
@@ -165,7 +157,9 @@ class MainWindow(QMainWindow):
             button.setEnabled(enabled)
             return button
 
-        def create_sub_layout(row, column, rowspan=1, columnspan=1, header_text=None, sub_items=[]):
+        def create_sub_layout(row, column, rowspan=1, columnspan=1, header_text=None, sub_items=None):
+            if sub_items is None:
+                sub_items = []
             layout = QVBoxLayout()
             layout.setAlignment(Qt.AlignTop)
             widget = QWidget()
@@ -189,7 +183,7 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
         self.setWindowTitle('Scheduler & Process Simulator')
-        self.setWindowIcon(QIcon('../resources/app_icon.png'))
+        self.setWindowIcon(QIcon(f'{os.path.dirname(os.path.realpath(__file__))}\\..\\resources\\app_icon.png'))
 
         # graph at the top
         self._ui['graph_canvas'].setMinimumSize(800, 500)
@@ -212,27 +206,27 @@ class MainWindow(QMainWindow):
         for idx in range(len(PROCESS_COLORS)):
             grid_row = idx + 2
             checkbox = QCheckBox()
-            process_layout.addWidget(checkbox, grid_row, 0, Qt.AlignmentFlag.AlignRight)
+            process_layout.addWidget(checkbox, grid_row, 0, Qt.AlignRight)
             label = QLabel(str(idx + 1))
             label.setStyleSheet(f'background-color : {PROCESS_COLORS[idx]};')
             process_layout.addWidget(label, grid_row, 1)
-            ready_time_spinbox = create_spinbox(0, MAX_SIM_TIME // 2)
+            ready_time_spinbox = create_spinbox(0, MAX_SIM_TIME - 1)
             process_layout.addWidget(ready_time_spinbox, grid_row, 2)
-            exec_time_spinbox = create_spinbox(1, MAX_SIM_TIME // 2)
+            exec_time_spinbox = create_spinbox(1, MAX_SIM_TIME)
             process_layout.addWidget(exec_time_spinbox, grid_row, 3)
             deadline_spinbox = create_spinbox(1, MAX_SIM_TIME)
             process_layout.addWidget(deadline_spinbox, grid_row, 4)
-            if set_default_values_for_exercise_1 and idx < len(DEFAULT_VALUES):
-                ready_time_spinbox.setValue(DEFAULT_VALUES[idx][0])
-                exec_time_spinbox.setValue(DEFAULT_VALUES[idx][1])
-                deadline_spinbox.setValue(DEFAULT_VALUES[idx][2])
+            if set_bss_examples and idx < len(BSS_EXAMPLES):
+                ready_time_spinbox.setValue(BSS_EXAMPLES[idx][0])
+                exec_time_spinbox.setValue(BSS_EXAMPLES[idx][1])
+                deadline_spinbox.setValue(BSS_EXAMPLES[idx][2])
             self._ui['process_selection'].append((checkbox, ready_time_spinbox, exec_time_spinbox, deadline_spinbox))
         create_sub_layout(1, 1, header_text='PROCESSES', sub_items=[process_layout])
 
         # scheduler configuration at the bottom right
         configuration_layout = QFormLayout()
         self._ui['strategy_selection'] = QComboBox()
-        self._ui['strategy_selection'].addItems(STRATEGIES)
+        self._ui['strategy_selection'].addItems(SCHEDULERS)
         self._ui['strategy_selection'].setStyleSheet('background-color : white; selection-color : black;')
         configuration_layout.addRow(QLabel('Scheduler-Strategy'), self._ui['strategy_selection'])
         self._ui['n_cpus_selection'] = create_spinbox(1, MAX_CPUS)

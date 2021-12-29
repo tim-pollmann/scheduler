@@ -34,9 +34,10 @@ class Scheduler(ABC):
         # one clock-cycle consists of the following 3 steps
 
         # 1. move processes, that got ready at the current time, from the blocked-list to the ready-list
-        self._ready_processes.extend([p for p in self._blocked_processes if p.ready_time <= self._time])
-        self._blocked_processes = [blocked_p for blocked_p in self._blocked_processes
-                                   if blocked_p not in self._ready_processes]
+        self._ready_processes.extend([process for process in self._blocked_processes
+                                      if process.ready_time <= self._time])
+        self._blocked_processes = [blocked_process for blocked_process in self._blocked_processes
+                                   if blocked_process not in self._ready_processes]
 
         # 2. update process-allocation
         self._update_process_allocation()
@@ -50,14 +51,14 @@ class Scheduler(ABC):
         if len(self._ready_processes) + len(self._blocked_processes) + len(
                 [None for cpu in self._cpus if cpu.has_process]) == 0:
             self._log('Finished all processes')
-            self._log(f'Average ready time was {self.avg_delta_time}')
+            self._log(f'Average delta time was {self.avg_delta_time}')
             return False
 
         self._time += 1
         return True
 
     def _log(self, text):
-        self._logger += '\n [TIME = ' + "{:2.0f}".format(self._time) + '] ' + text
+        self._logger += ' [TIME = ' + "{:2.0f}".format(self._time) + '] ' + text + '\n'
 
     def _allocate_process(self, cpu, process):
         self._ready_processes.remove(process)
@@ -201,6 +202,17 @@ class PEdfScheduler(PreemptiveScheduler):
     def _sort_processes(process):
         # sort by deadline
         return process.deadline
+
+
+# class for preemptive "least laxity first"-schedulers
+class PLlfScheduler(PreemptiveScheduler):
+    def __init__(self, n_cpus, processes):
+        super().__init__(n_cpus, processes)
+
+    @staticmethod
+    def _sort_processes(process):
+        # sort by laxity
+        return process.deadline - process.ready_time - process.exec_time
 
 
 # class for preemptive "round robin"-schedulers
