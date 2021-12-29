@@ -3,11 +3,14 @@ from process import Process
 from scheduler import NpSjfScheduler, PSjfScheduler, PRrScheduler
 
 
+# for exercise 2 and exercise 3
 EXEC_TIMES = [22, 2, 3, 5, 8]
+# only for exercise 3
 READY_TIMES = [0, 0, 4, 4, 4]
 
 
-def exercise2(quantum):
+# permute the order of the process (== permute order of exec-times, since they are all 0) for "Round Robin"-Scheduler
+def exercise_2(quantum=3):
     permutations = itertools.permutations(EXEC_TIMES)
     perm_to_time = {}
 
@@ -26,7 +29,8 @@ def exercise2(quantum):
         print(f'Permutation: {permutation}, Average delta time: {avg_delta_time}')
 
 
-def exercise3():
+# permute order of ready times for nonpreemptive and preemptive  "Shortest Job First"-Scheduler
+def exercise_3():
     def permute(scheduler_type, scheduler_name):
         permutations = itertools.permutations(READY_TIMES)
         perm_to_time = {}

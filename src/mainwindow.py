@@ -3,30 +3,48 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QMainWindow, QGridLayout, QFormLayout, QSpinBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QComboBox, QPushButton, QCheckBox)
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import (QMainWindow, QGridLayout, QFormLayout, QSpinBox, QWidget, QVBoxLayout, QLayout, QLabel,
+                             QComboBox, QPushButton, QCheckBox, QSizePolicy)
 from process import Process
 from scheduler import (NpFcfsScheduler, NpSjfScheduler, NpEdfScheduler, NpLlfScheduler, PSjfScheduler, PEdfScheduler,
                        PRrScheduler)
-
 
 MAX_CPUS = 4
 MAX_SIM_TIME = 100
 MAX_QUANTUM = 10
 LINE_WIDTH = 0.2
-PROCESS_COLORS = ['red', 'blue', 'green', 'yellow', 'magenta', 'grey', 'cyan', 'chocolate', 'blueviolet', 'brown',
-                  'darkred', 'salmon', 'gold', 'khaki', 'hotpink', 'limegreen', 'lightblue', 'navy', 'olive', 'orange']
-STRATEGIES = ['First Come First Serve (nonpreemptive)', 'Shortest Job First (nonpreemptive)',
-              'Earliest Deadline First (nonpreemptive)', 'Least Laxity First (nonpreemptive)',
-              'Shortest Job First (preemptive)', 'Earliest Deadline First (preemptive)', 'Round Robin (preemptive)']
+PROCESS_COLORS = [
+    'red', 'blue', 'green', 'yellow', 'magenta', 'grey', 'cyan', 'chocolate', 'blueviolet', 'brown', 'darkred',
+    'salmon', 'gold', 'khaki', 'hotpink', 'limegreen', 'lightblue', 'navy', 'olive', 'orange', 'lightgray', 'darkgreen'
+]
+
+STRATEGIES = [
+    'First Come First Serve (nonpreemptive)', 'Shortest Job First (nonpreemptive)',
+    'Earliest Deadline First (nonpreemptive)', 'Least Laxity First (nonpreemptive)', 'Shortest Job First (preemptive)',
+    'Earliest Deadline First (preemptive)', 'Round Robin (preemptive)'
+]
+
+DEFAULT_VALUES = [
+    # example 1 for FCFS, SJF, RR
+    (0, 22, 0), (0, 2, 0), (0, 3, 0), (0, 5, 0), (0, 8, 0),
+    # example 2 for FCFS, SJF, RR
+    (0, 22, 0), (0, 2, 0), (4, 3, 0), (4, 5, 0), (4, 8, 0),
+    # example 3 for FCFS, SJF, RR
+    (0, 15, 0), (0, 7, 0), (0, 1, 0), (0, 4, 0), (0, 8, 0),
+    # example 1 for EDF, LLF
+    (0, 4, 9), (0, 5, 9), (0, 8, 10),
+    # example 2 for EDF, LLF
+    (0, 4, 5), (0, 1, 7), (0, 2, 7), (0, 5, 13),
+]
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, set_default_values_for_exercise_1=False):
         super().__init__()
         self._ui = {}
         self._init_mpl()
-        self._init_qt()
+        self._init_qt(set_default_values_for_exercise_1)
 
         self._scheduler = None
         self._graph_data = []
@@ -90,6 +108,7 @@ class MainWindow(QMainWindow):
         self._update_logger()
 
     def _update_logger(self):
+        print( self._ui['logger'].size())
         if self._scheduler is not None:
             self._ui['logger'].setText(self._scheduler.logger)
         else:
@@ -111,13 +130,13 @@ class MainWindow(QMainWindow):
 
     # init the matplotlib-graph
     def _init_mpl(self):
-        fig = Figure()
+        fig = Figure(facecolor='lightgray')
         self._ui['graph_canvas'] = FigureCanvasQTAgg(fig)
         self._ui['graph_axes'] = fig.add_subplot()
 
         self._ui['graph_axes'].xaxis.set_label_position('top')
-        self._ui['graph_axes'].set_xlabel('Time')
-        self._ui['graph_axes'].set_ylabel('CPUs')
+        self._ui['graph_axes'].set_xlabel('Time', fontsize=16)
+        self._ui['graph_axes'].set_ylabel('CPUs', fontsize=16)
 
         self._ui['graph_axes'].set_xlim(0, MAX_SIM_TIME)
         self._ui['graph_axes'].set_ylim(0.5, MAX_CPUS + 0.5)
@@ -126,16 +145,18 @@ class MainWindow(QMainWindow):
         self._ui['graph_axes'].set_xticks(np.arange(0, MAX_SIM_TIME + 1, 5))
         self._ui['graph_axes'].set_xticks(np.arange(0, MAX_SIM_TIME + 1, 1), minor=True)
         self._ui['graph_axes'].set_yticks(np.arange(1, MAX_CPUS + 1, 1))
+        self._ui['graph_axes'].tick_params(labelsize=14)
 
         self._ui['graph_axes'].grid(axis='x', which='major', alpha=0.7)
         self._ui['graph_axes'].grid(axis='x', which='minor', alpha=0.35)
 
     # init the qt-ui
     # not the most elegant solution but it does its job :)
-    def _init_qt(self):
+    def _init_qt(self, set_default_values_for_exercise_1):
         def create_spinbox(min_value, max_value):
             spinbox = QSpinBox()
             spinbox.setRange(min_value, max_value)
+            spinbox.setStyleSheet('background-color : white;')
             return spinbox
 
         def create_button(text, onclick, enabled=True):
@@ -144,79 +165,89 @@ class MainWindow(QMainWindow):
             button.setEnabled(enabled)
             return button
 
-        # bottom left ui
+        def create_sub_layout(row, column, rowspan=1, columnspan=1, header_text=None, sub_items=[]):
+            layout = QVBoxLayout()
+            layout.setAlignment(Qt.AlignTop)
+            widget = QWidget()
+            widget.setStyleSheet('background-color : lightgray;')
+            widget.setLayout(layout)
+            if header_text is not None:
+                header = QLabel(header_text)
+                header.setStyleSheet('font-weight : bold; font-size : 25px; alignment : center;')
+                header.setAlignment(Qt.AlignHCenter)
+                layout.addWidget(header, 0)
+            for sub_item in sub_items:
+                if isinstance(sub_item, QWidget):
+                    layout.addWidget(sub_item)
+                elif isinstance(sub_item, QLayout):
+                    layout.addLayout(sub_item)
+            main_layout.addWidget(widget, row, column, rowspan, columnspan)
+
+        # window config
+        main_layout = QGridLayout()
+        central_widget = QWidget()
+        central_widget.setLayout(main_layout)
+        self.setCentralWidget(central_widget)
+        self.setWindowTitle('Scheduler & Process Simulator')
+        self.setWindowIcon(QIcon('../resources/app_icon.png'))
+
+        # graph at the top
+        self._ui['graph_canvas'].setMinimumSize(800, 500)
+        create_sub_layout(0, 0, columnspan=3, sub_items=[self._ui['graph_canvas']])
+
+        # logger at the bottom left
         self._ui['logger'] = QLabel('')
-        self._ui['logger'].setAlignment(Qt.AlignmentFlag.AlignBottom)
+        self._ui['logger'].setMinimumWidth(450)
+        self._ui['logger'].setStyleSheet('font-size : 20px;')
+        create_sub_layout(1, 0, header_text='LOGGER', sub_items=[self._ui['logger']])
 
-        # bottom center ui
-        middle_layout = QGridLayout()
-        middle_layout.addWidget(QLabel('PID'), 0, 1)
-        middle_layout.addWidget(QLabel('Ready Time'), 0, 2)
-        middle_layout.addWidget(QLabel('Execution Time'), 0, 3)
-        middle_layout.addWidget(QLabel('Deadline'), 0, 4)
-
+        # process selection at the bottom center
+        process_layout = QGridLayout()
+        process_layout.addWidget(QLabel('PID'), 1, 1, Qt.AlignBottom)
+        process_layout.addWidget(QLabel('Ready Time'), 1, 2, Qt.AlignBottom)
+        process_layout.addWidget(QLabel('Execution Time'), 1, 3, Qt.AlignBottom)
+        process_layout.addWidget(QLabel('Deadline'), 1, 4, Qt.AlignBottom)
+        process_layout.addWidget(QLabel(''), 1, 5, Qt.AlignBottom)
         self._ui['process_selection'] = []
-
-        for row in range(len(PROCESS_COLORS)):
+        for idx in range(len(PROCESS_COLORS)):
+            grid_row = idx + 2
             checkbox = QCheckBox()
-            middle_layout.addWidget(checkbox, row + 1, 0, Qt.AlignmentFlag.AlignRight)
-
-            label = QLabel(str(row + 1))
-            color = PROCESS_COLORS[row]
-            label.setStyleSheet("QLabel { background-color : " + color + "; }")
-            middle_layout.addWidget(label, row + 1, 1)
-
+            process_layout.addWidget(checkbox, grid_row, 0, Qt.AlignmentFlag.AlignRight)
+            label = QLabel(str(idx + 1))
+            label.setStyleSheet(f'background-color : {PROCESS_COLORS[idx]};')
+            process_layout.addWidget(label, grid_row, 1)
             ready_time_spinbox = create_spinbox(0, MAX_SIM_TIME // 2)
-            middle_layout.addWidget(ready_time_spinbox, row + 1, 2)
-
+            process_layout.addWidget(ready_time_spinbox, grid_row, 2)
             exec_time_spinbox = create_spinbox(1, MAX_SIM_TIME // 2)
-            middle_layout.addWidget(exec_time_spinbox, row + 1, 3)
-
+            process_layout.addWidget(exec_time_spinbox, grid_row, 3)
             deadline_spinbox = create_spinbox(1, MAX_SIM_TIME)
-            middle_layout.addWidget(deadline_spinbox, row + 1, 4)
-
+            process_layout.addWidget(deadline_spinbox, grid_row, 4)
+            if set_default_values_for_exercise_1 and idx < len(DEFAULT_VALUES):
+                ready_time_spinbox.setValue(DEFAULT_VALUES[idx][0])
+                exec_time_spinbox.setValue(DEFAULT_VALUES[idx][1])
+                deadline_spinbox.setValue(DEFAULT_VALUES[idx][2])
             self._ui['process_selection'].append((checkbox, ready_time_spinbox, exec_time_spinbox, deadline_spinbox))
+        create_sub_layout(1, 1, header_text='PROCESSES', sub_items=[process_layout])
 
-        # bottom right ui
-        right_layout = QVBoxLayout()
-
+        # scheduler configuration at the bottom right
         configuration_layout = QFormLayout()
         self._ui['strategy_selection'] = QComboBox()
         self._ui['strategy_selection'].addItems(STRATEGIES)
+        self._ui['strategy_selection'].setStyleSheet('background-color : white; selection-color : black;')
         configuration_layout.addRow(QLabel('Scheduler-Strategy'), self._ui['strategy_selection'])
-
         self._ui['n_cpus_selection'] = create_spinbox(1, MAX_CPUS)
         configuration_layout.addRow(QLabel('Number of CPUs (except "Round Robin"-Schedulers")'),
                                     self._ui['n_cpus_selection'])
-
         self._ui['quantum_selection'] = create_spinbox(1, MAX_QUANTUM)
-        configuration_layout.addRow(QLabel('Quantum (only for "Round Robin"-Schedulers")'),
-                                    self._ui['quantum_selection'])
-        right_layout.addLayout(configuration_layout)
-
+        configuration_layout.addRow(QLabel('Quantum (only "Round Robin"-Schedulers")'), self._ui['quantum_selection'])
         self._ui['init_sim_button'] = create_button('Initialize Simulation', self._init_sim_button_clicked)
-        right_layout.addWidget(self._ui['init_sim_button'])
         self._ui['next_step_button'] = create_button('Do Next Simulation Step', self._next_step_button_clicked, False)
-        right_layout.addWidget(self._ui['next_step_button'])
         self._ui['run_sim_button'] = create_button('Run Complete Simulation', self._run_sim_button_clicked, False)
-        right_layout.addWidget(self._ui['run_sim_button'])
         self._ui['reset_sim_button'] = create_button('Reset Simulation', self._reset_sim_button_clicked, False)
-        right_layout.addWidget(self._ui['reset_sim_button'])
+        create_sub_layout(1, 2, header_text='SCHEDULER CONFIGURATION', sub_items=[configuration_layout,
+                                                                                  self._ui['init_sim_button'],
+                                                                                  self._ui['next_step_button'],
+                                                                                  self._ui['run_sim_button'],
+                                                                                  self._ui['reset_sim_button']])
 
-        # whole bottom ui
-        lower_layout = QHBoxLayout()
-        lower_layout.addWidget(self._ui['logger'])
-        lower_layout.addLayout(middle_layout)
-        lower_layout.addLayout(right_layout)
-
-        # complete ui
-        main_layout = QVBoxLayout()
-        main_layout.addWidget(self._ui['graph_canvas'])
-        main_layout.addLayout(lower_layout)
-
-        central_widget = QWidget()
-        central_widget.setLayout(main_layout)
-
-        self.setWindowTitle('Scheduler & Process Simulator')
-        self.setCentralWidget(central_widget)
         self.showMaximized()

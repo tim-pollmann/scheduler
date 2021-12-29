@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod, abstractstaticmethod
+from abc import ABC, abstractmethod
 from cpu import CPU
 
 
@@ -66,6 +66,7 @@ class Scheduler(ABC):
 
     def _deallocate_process(self, cpu):
         self._ready_processes.append(cpu.current_process)
+        self._log(f'Deallocated process {cpu.current_process.id} from CPU #{cpu.id}')
         cpu.deallocate_process()
 
     def _deallocate_finished_process(self, cpu):
@@ -81,7 +82,8 @@ class Scheduler(ABC):
 
     # sorts the processes based on the scheduler-strategy
     # will be implemented by the ultimate schedulers
-    @abstractstaticmethod
+    @staticmethod
+    @abstractmethod
     def _sort_processes(process):
         pass
 
@@ -219,8 +221,7 @@ class PRrScheduler(PreemptiveScheduler):
 
         if self._ready_processes:
             if self._quantum_counter >= self._quantum and cpu.has_process:
-                self._ready_processes.append(cpu.current_process)
-                cpu.deallocate_process()
+                self._deallocate_process(cpu)
 
             # if a cpu has no process
             if not cpu.has_process:
