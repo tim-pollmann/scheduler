@@ -1,32 +1,26 @@
-import numpy as np
 import os
+import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QMainWindow, QLayout, QGridLayout, QFormLayout, QVBoxLayout, QWidget, QSpinBox, QLabel,
-                             QComboBox, QPushButton, QCheckBox)
+                             QComboBox, QPushButton, QCheckBox, QTextEdit)
 from process import Process
 from scheduler import (NpFcfsScheduler, NpSjfScheduler, NpEdfScheduler, NpLlfScheduler, PSjfScheduler, PEdfScheduler,
                        PLlfScheduler, PRrScheduler)
-from bss_exercises import BSS_EXAMPLES
+from globals import SCHEDULERS, BSS_EXAMPLES
 
+
+# gui-specific constants
 MAX_CPUS = 4
 MAX_SIM_TIME = 100
 MAX_QUANTUM = 10
 LINE_WIDTH = 0.2
-
 PROCESS_COLORS = [
     'red', 'blue', 'green', 'yellow', 'magenta', 'grey', 'cyan', 'chocolate', 'blueviolet', 'brown', 'darkred',
-    'salmon', 'gold', 'khaki', 'hotpink', 'limegreen', 'lightblue', 'navy', 'olive', 'orange',
-    # 'lightgray', 'darkgreen'
-]
-
-SCHEDULERS = [
-    'First Come First Serve (nonpreemptive)', 'Shortest Job First (nonpreemptive)',
-    'Earliest Deadline First (nonpreemptive)', 'Least Laxity First (nonpreemptive)', 'Shortest Job First (preemptive)',
-    'Earliest Deadline First (preemptive)', 'Least Laxity First (preemptive)', 'Round Robin (preemptive)'
+    'salmon', 'gold', 'khaki', 'hotpink', 'limegreen', 'lightblue', 'navy', 'olive', 'orange'
 ]
 
 
@@ -40,9 +34,23 @@ class MainWindow(QMainWindow):
         self._scheduler = None
         self._graph_data = []
 
+    # called when the users selects another strategy in the combobox
+    def _strategy_changed(self, idx):
+        if idx == 7:
+            self._ui['quantum_selection'].setEnabled(True)
+            self._ui['quantum_selection'].setSpecialValueText('')
+            self._ui['n_cpus_selection'].setValue(1)
+            self._ui['n_cpus_selection'].setEnabled(False)
+        else:
+            self._ui['n_cpus_selection'].setEnabled(True)
+            self._ui['quantum_selection'].setSpecialValueText('-')
+            self._ui['quantum_selection'].setValue(1)
+            self._ui['quantum_selection'].setEnabled(False)
+
     def _init_sim_button_clicked(self):
         n_cpus = (self._ui['n_cpus_selection'].value())
 
+        # create a list of all selected processes
         processes = [Process(idx + 1, ready_time_box.value(), exec_time_box.value(), deadline_box.value())
                      for idx, (checkbox, ready_time_box, exec_time_box, deadline_box)
                      in enumerate(self._ui['process_selection'])
@@ -143,7 +151,6 @@ class MainWindow(QMainWindow):
         self._ui['graph_axes'].grid(axis='x', which='minor', alpha=0.35)
 
     # init the qt-ui
-    # not the most elegant solution but it does its job :)
     def _init_qt(self, set_bss_examples):
         def create_spinbox(min_value, max_value):
             spinbox = QSpinBox()
@@ -157,6 +164,7 @@ class MainWindow(QMainWindow):
             button.setEnabled(enabled)
             return button
 
+        # helper function to create subwidgets/ -layouts like the graph, logger, process selection or simulation config
         def create_sub_layout(row, column, rowspan=1, columnspan=1, header_text=None, sub_items=None):
             if sub_items is None:
                 sub_items = []
@@ -167,7 +175,7 @@ class MainWindow(QMainWindow):
             widget.setLayout(layout)
             if header_text is not None:
                 header = QLabel(header_text)
-                header.setStyleSheet('font-weight : bold; font-size : 25px; alignment : center;')
+                header.setStyleSheet('font-weight : bold; font-size : 26px; alignment : center;')
                 header.setAlignment(Qt.AlignHCenter)
                 layout.addWidget(header, 0)
             for sub_item in sub_items:
@@ -176,26 +184,29 @@ class MainWindow(QMainWindow):
                 elif isinstance(sub_item, QLayout):
                     layout.addLayout(sub_item)
             main_layout.addWidget(widget, row, column, rowspan, columnspan)
+            main_layout.setColumnStretch(column, 1)
 
         # window config
         main_layout = QGridLayout()
         central_widget = QWidget()
+        central_widget.setStyleSheet('font-size : 20px;')
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
         self.setWindowTitle('Scheduler & Process Simulator')
         self.setWindowIcon(QIcon(f'{os.path.dirname(os.path.realpath(__file__))}\\..\\resources\\app_icon.png'))
 
-        # graph at the top
+        # graph
         self._ui['graph_canvas'].setMinimumSize(800, 500)
         create_sub_layout(0, 0, columnspan=3, sub_items=[self._ui['graph_canvas']])
 
-        # logger at the bottom left
-        self._ui['logger'] = QLabel('')
-        self._ui['logger'].setMinimumWidth(450)
-        self._ui['logger'].setStyleSheet('font-size : 20px;')
+        # logger
+        self._ui['logger'] = QTextEdit('')
+        self._ui['logger'].setReadOnly(True)
+        self._ui['logger'].setMinimumWidth(500)
+        self._ui['logger'].setStyleSheet("border: none ")
         create_sub_layout(1, 0, header_text='LOGGER', sub_items=[self._ui['logger']])
 
-        # process selection at the bottom center
+        # process selection
         process_layout = QGridLayout()
         process_layout.addWidget(QLabel('PID'), 1, 1, Qt.AlignBottom)
         process_layout.addWidget(QLabel('Ready Time'), 1, 2, Qt.AlignBottom)
@@ -223,22 +234,24 @@ class MainWindow(QMainWindow):
             self._ui['process_selection'].append((checkbox, ready_time_spinbox, exec_time_spinbox, deadline_spinbox))
         create_sub_layout(1, 1, header_text='PROCESSES', sub_items=[process_layout])
 
-        # scheduler configuration at the bottom right
-        configuration_layout = QFormLayout()
+        # scheduler config
+        config_layout = QFormLayout()
         self._ui['strategy_selection'] = QComboBox()
         self._ui['strategy_selection'].addItems(SCHEDULERS)
+        self._ui['strategy_selection'].currentIndexChanged.connect(self._strategy_changed)
         self._ui['strategy_selection'].setStyleSheet('background-color : white; selection-color : black;')
-        configuration_layout.addRow(QLabel('Scheduler-Strategy'), self._ui['strategy_selection'])
+        config_layout.addRow(QLabel('Scheduler-Strategy'), self._ui['strategy_selection'])
         self._ui['n_cpus_selection'] = create_spinbox(1, MAX_CPUS)
-        configuration_layout.addRow(QLabel('Number of CPUs (except "Round Robin"-Schedulers")'),
-                                    self._ui['n_cpus_selection'])
+        config_layout.addRow(QLabel('Number of CPUs'), self._ui['n_cpus_selection'])
         self._ui['quantum_selection'] = create_spinbox(1, MAX_QUANTUM)
-        configuration_layout.addRow(QLabel('Quantum (only "Round Robin"-Schedulers")'), self._ui['quantum_selection'])
+        self._ui['quantum_selection'].setSpecialValueText('-')
+        self._ui['quantum_selection'].setEnabled(False)
+        config_layout.addRow(QLabel('Quantum (only "Round Robin")'), self._ui['quantum_selection'])
         self._ui['init_sim_button'] = create_button('Initialize Simulation', self._init_sim_button_clicked)
         self._ui['next_step_button'] = create_button('Do Next Simulation Step', self._next_step_button_clicked, False)
         self._ui['run_sim_button'] = create_button('Run Complete Simulation', self._run_sim_button_clicked, False)
         self._ui['reset_sim_button'] = create_button('Reset Simulation', self._reset_sim_button_clicked, False)
-        create_sub_layout(1, 2, header_text='SCHEDULER CONFIGURATION', sub_items=[configuration_layout,
+        create_sub_layout(1, 2, header_text='SCHEDULER CONFIGURATION', sub_items=[config_layout,
                                                                                   self._ui['init_sim_button'],
                                                                                   self._ui['next_step_button'],
                                                                                   self._ui['run_sim_button'],
