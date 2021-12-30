@@ -23,6 +23,10 @@ class Process:
         return self._deadline
 
     @property
+    def program_counter(self):
+        return self._program_counter
+
+    @property
     def is_finished(self):
         return self._exec_time <= self._program_counter
 
