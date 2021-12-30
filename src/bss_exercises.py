@@ -62,8 +62,7 @@ def exercise_2(quantum, sort_by_avg_delta_time):
     # permute the order of the processes
     for permutation in itertools.permutations([Process(idx + 1, ready_time, exec_time, deadline)
                                                for idx, (ready_time, exec_time, deadline)
-                                               in enumerate(BSS_EXAMPLES[5:10])]):
-
+                                               in enumerate(BSS_EXAMPLES[0:5])]):
         # init scheduler
         scheduler = PRrScheduler(copy.deepcopy(permutation), quantum)
 
@@ -72,7 +71,8 @@ def exercise_2(quantum, sort_by_avg_delta_time):
 
         # store results in dict
         perm_to_time[tuple([(process.ready_time, process.exec_time, process.deadline)
-                            for process in permutation])] = scheduler.avg_delta_time
+                            for process
+                            in permutation])] = scheduler.avg_delta_time
 
     print_permutations(f'Round Robin (preemptive), Quantum: {quantum}', perm_to_time, sort_by_avg_delta_time)
 
@@ -90,7 +90,9 @@ def exercise_3(sort_by_avg_delta_time):
 
             # run simulation until its finished
             scheduler.run_until_finished()
-            perm_to_time[permutation] = scheduler.avg_delta_time
+            perm_to_time[tuple([(ready_time, exec_time, deadline)
+                                for ready_time, (_, exec_time, deadline)
+                                in zip(permutation, BSS_EXAMPLES[5:10])])] = scheduler.avg_delta_time
 
         # store results in dict
         print_permutations(scheduler_name, perm_to_time, sort_by_avg_delta_time)
