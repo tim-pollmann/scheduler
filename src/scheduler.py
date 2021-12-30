@@ -162,6 +162,8 @@ class NpSjfScheduler(NonPreemptiveScheduler):
     @staticmethod
     def _sort_processes(process):
         # sort by execution time
+        # since this is nonpreemptive we do not need to consider the program counter
+        # (for processes in the ready list it is always 0)
         return process.exec_time
 
 
@@ -185,8 +187,9 @@ class NpLlfScheduler(NonPreemptiveScheduler):
     def _sort_processes(process):
         # sort by laxity
         # we do not need to consider the current timestamp here because it would be the same for every process
-        # since this is preemptive we do not need to consider the program counter either
-        return process.deadline - process.ready_time - process.exec_time
+        # since this is nonpreemptive we do not need to consider the program counter either
+        # (for processes in the ready list it is always 0)
+        return process.deadline - process.exec_time
 
 
 # class for preemptive "shortest job first"-schedulers
@@ -220,7 +223,7 @@ class PLlfScheduler(PreemptiveScheduler):
     def _sort_processes(process):
         # sort by laxity
         # we do not need to consider the current timestamp here because it would be the same for every process
-        return process.deadline - process.ready_time - process.exec_time + process.program_counter
+        return process.deadline - process.exec_time + process.program_counter
 
 
 # class for preemptive "round robin"-schedulers
