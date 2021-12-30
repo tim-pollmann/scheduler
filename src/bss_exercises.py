@@ -58,12 +58,13 @@ def print_permutations(scheduler_name, perm_to_time, sort_by_avg_delta_time):
 def exercise_2(quantum, sort_by_avg_delta_time):
     perm_to_time = {}
 
-    # permute the order of the processes (== permute the order of their execution times since they are all arriving at
-    # the same timestamp and the deadlines are not even considered in the calculation
-    for permutation in itertools.permutations([process_config[1] for process_config in BSS_EXAMPLES[0:5]]):
+    # permute the order of the processes
+    for permutation in itertools.permutations([Process(idx + 1, ready_time, exec_time, deadline)
+                                               for idx, (ready_time, exec_time, deadline)
+                                               in enumerate(BSS_EXAMPLES[5:10])]):
+        
         # init scheduler
-        scheduler = PRrScheduler([Process(idx + 1, 0, exec_time, 0) for idx, exec_time
-                                  in enumerate(permutation)], quantum)
+        scheduler = PRrScheduler(permutation, quantum)
 
         # run simulation until its finished
         scheduler.run_until_finished()
