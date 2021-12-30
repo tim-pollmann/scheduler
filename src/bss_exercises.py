@@ -1,121 +1,96 @@
 import itertools
 from process import Process
 from scheduler import (NpFcfsScheduler, NpSjfScheduler, NpEdfScheduler, NpLlfScheduler, PSjfScheduler, PEdfScheduler,
-                       PLlfScheduler, PRrScheduler)
-
-BSS_EXAMPLES = [
-    # example 1 for FCFS, SJF, RR
-    (0, 22, 0),
-    (0, 2, 0),
-    (0, 3, 0),
-    (0, 5, 0),
-    (0, 8, 0),
-    # example 2 for FCFS, SJF, RR
-    (0, 22, 0),
-    (0, 2, 0),
-    (4, 3, 0),
-    (4, 5, 0),
-    (4, 8, 0),
-    # example 1 for EDF, LLF
-    (0, 4, 9),
-    (0, 5, 9),
-    (0, 8, 10),
-    # example 2 for EDF, LLF
-    (0, 4, 5),
-    (0, 1, 7),
-    (0, 2, 7),
-    (0, 5, 13)
-]
+                       PRrScheduler)
+from globals import SCHEDULERS, BSS_EXAMPLES
 
 
-def exercise_1(print_logger=False):
-    def run_scheduler(scheduler_type, scheduler_name, process_configs):
-        scheduler = scheduler_type(1, [Process(idx + 1, ready_time, exec_time, deadline)
-                                       for idx, (ready_time, exec_time, deadline)
-                                       in enumerate(process_configs)])
-        while scheduler.step():
-            pass
+def exercise_1(quantum, print_logger):
+    # helper function to run the scheduling simulation
+    def run_simulation(scheduler_type, scheduler_name, n_cpus, process_configs):
+        # init scheduler
+        if scheduler_type == PRrScheduler:
+            scheduler = PRrScheduler([Process(idx + 1, ready_time, exec_time, deadline)
+                                      for idx, (ready_time, exec_time, deadline)
+                                      in enumerate(process_configs)], quantum)
+        else:
+            scheduler = scheduler_type(n_cpus, [Process(idx + 1, ready_time, exec_time, deadline)
+                                                for idx, (ready_time, exec_time, deadline)
+                                                in enumerate(process_configs)])
 
-        print(f'Scheduler: {scheduler_name}')
+        # run simulation until its finished
+        scheduler.run_until_finished()
+
+        # print the result
+        print(f'Scheduler: {scheduler_name} with {n_cpus} {"CPU" if n_cpus == 1 else "CPUs"}')
         print(f'Process configurations: {process_configs}')
         if print_logger:
             print(scheduler.logger)
         else:
-            print(f'Average delta time was {scheduler.avg_delta_time}')
+            print(f'Average delta time was {scheduler.avg_delta_time}\n')
 
-    def run_rr_scheduler(process_configs):
-        for quantum in range(5):
-            scheduler = PRrScheduler([Process(idx + 1, ready_time, exec_time, deadline)
-                                      for idx, (ready_time, exec_time, deadline)
-                                      in enumerate(process_configs)], quantum)
-            while scheduler.step():
-                pass
-
-            print(f'Scheduler: Round Robin (preemptive), Quantum: {quantum}')
-            print(f'Process configurations: {process_configs}')
-            if print_logger:
-                print(scheduler.logger)
-            else:
-                print(f'Average delta time was {scheduler.avg_delta_time}')
-
-    run_scheduler(NpFcfsScheduler, 'First Come First Serve (nonpreemptive)', BSS_EXAMPLES[0:5])
-    run_scheduler(NpFcfsScheduler, 'First Come First Serve (nonpreemptive)', BSS_EXAMPLES[5:10])
-    run_scheduler(NpSjfScheduler, 'Shortest Job First (nonpreemptive)', BSS_EXAMPLES[0:5])
-    run_scheduler(NpSjfScheduler, 'Shortest Job First (nonpreemptive)', BSS_EXAMPLES[5:10])
-    run_scheduler(PSjfScheduler, 'Shortest Job First (preemptive)', BSS_EXAMPLES[0:5])
-    run_scheduler(PSjfScheduler, 'Shortest Job First (preemptive)', BSS_EXAMPLES[5:10])
-    run_scheduler(NpEdfScheduler, 'Earliest Deadline First (nonpreemptive)', BSS_EXAMPLES[10:13])
-    run_scheduler(NpEdfScheduler, 'Earliest Deadline First (nonpreemptive)', BSS_EXAMPLES[13:17])
-    run_scheduler(PEdfScheduler, 'Earliest Deadline First (preemptive)', BSS_EXAMPLES[10:13])
-    run_scheduler(PEdfScheduler, 'Earliest Deadline First (preemptive)', BSS_EXAMPLES[13:17])
-    run_scheduler(NpLlfScheduler, 'Least Laxity First (nonpreemptive)', BSS_EXAMPLES[10:13])
-    run_scheduler(NpLlfScheduler, 'Least Laxity First (nonpreemptive)', BSS_EXAMPLES[13:17])
-    run_scheduler(PLlfScheduler, 'Least Laxity First (preemptive)', BSS_EXAMPLES[10:13])
-    run_scheduler(PLlfScheduler, 'Least Laxity First (preemptive)', BSS_EXAMPLES[13:17])
-    run_rr_scheduler(BSS_EXAMPLES[0:5])
-    run_rr_scheduler(BSS_EXAMPLES[5:10])
+    # examples are executed in the same order as they occur in the bss script
+    run_simulation(NpFcfsScheduler, SCHEDULERS[0], 1, BSS_EXAMPLES[0:5])
+    run_simulation(NpSjfScheduler, SCHEDULERS[1], 1, BSS_EXAMPLES[0:5])
+    run_simulation(NpEdfScheduler, SCHEDULERS[2], 2, BSS_EXAMPLES[10:13])
+    run_simulation(NpLlfScheduler, SCHEDULERS[3], 2, BSS_EXAMPLES[10:13])
+    run_simulation(PRrScheduler, f'{SCHEDULERS[7]}, Quantum: {quantum},', 1, BSS_EXAMPLES[0:5])
+    run_simulation(PSjfScheduler, SCHEDULERS[4], 1, BSS_EXAMPLES[5:10])
+    run_simulation(NpSjfScheduler, SCHEDULERS[1], 1, BSS_EXAMPLES[5:10])
+    run_simulation(PEdfScheduler, SCHEDULERS[5], 1, BSS_EXAMPLES[13:17])
 
 
-# permute the order of processes (== permute order of exec-times, since other values are all 0)
-def exercise_2(quantum):
-    perm_to_time = {}
+# a simple helper function to print the results of exercise 2 and 3
+def print_permutations(scheduler_name, perm_to_time, sort_by_avg_delta_time):
+    print(f'Scheduler: {scheduler_name}')
 
-    for exec_time_permutation in itertools.permutations([process_config[1] for process_config in BSS_EXAMPLES[0:5]]):
-        scheduler = PRrScheduler([Process(idx + 1, 0, exec_time, 0) for idx, exec_time
-                                  in enumerate(exec_time_permutation)], quantum)
+    if sort_by_avg_delta_time:
+        perm_to_time = sorted(perm_to_time.items(), key=lambda item: item[1])
+    else:
+        perm_to_time = list(perm_to_time.items())
 
-        while scheduler.step():
-            pass
-
-        perm_to_time[exec_time_permutation] = scheduler.avg_delta_time
-
-    print(f'Scheduler: Round Robin (preemptive), Quantum: {quantum}')
-    for ready_time_permutation, avg_delta_time in sorted(perm_to_time.items(), key=lambda item: item[1]):
-        print(f'Ready time permutation: {ready_time_permutation}, Average delta time: {avg_delta_time}')
+    for permutation, avg_delta_time in perm_to_time:
+        print(f'Permutation: {permutation}, Average delta time: {avg_delta_time}')
     print()
 
 
-# permute order of ready times for nonpreemptive and preemptive  "Shortest Job First"-Scheduler
-def exercise_3():
+# in exercise 2 and 3 the results are stored in a dict "perm_to_time" to allow them to be sorted by average delta time
+def exercise_2(quantum, sort_by_avg_delta_time):
+    perm_to_time = {}
+
+    # permute the order of the processes (== permute the order of their execution times since they are all arriving at
+    # the same timestamp and the deadlines are not even considered in the calculation
+    for permutation in itertools.permutations([process_config[1] for process_config in BSS_EXAMPLES[0:5]]):
+        # init scheduler
+        scheduler = PRrScheduler([Process(idx + 1, 0, exec_time, 0) for idx, exec_time
+                                  in enumerate(permutation)], quantum)
+
+        # run simulation until its finished
+        scheduler.run_until_finished()
+
+        # store results in dict
+        perm_to_time[permutation] = scheduler.avg_delta_time
+
+    print_permutations(f'Round Robin (preemptive), Quantum: {quantum}', perm_to_time, sort_by_avg_delta_time)
+
+
+def exercise_3(sort_by_avg_delta_time):
     def permute(scheduler_type, scheduler_name):
-        process_configs = BSS_EXAMPLES[5:10]
-        ready_time_permutations = itertools.permutations([process_config[0] for process_config in process_configs])
         perm_to_time = {}
 
-        for ready_time_permutation in ready_time_permutations:
+        # permute the ready times of the processes
+        for permutation in itertools.permutations([process_config[0] for process_config in BSS_EXAMPLES[5:10]]):
+            # init scheduler
             scheduler = scheduler_type(1, [Process(idx + 1, ready_time, exec_time, deadline)
                                            for idx, (ready_time, (_, exec_time, deadline))
-                                           in enumerate(zip(ready_time_permutation, process_configs))])
+                                           in enumerate(zip(permutation, BSS_EXAMPLES[5:10]))])
 
-            while scheduler.step():
-                pass
+            # run simulation until its finished
+            scheduler.run_until_finished()
+            perm_to_time[permutation] = scheduler.avg_delta_time
 
-            perm_to_time[ready_time_permutation] = scheduler.avg_delta_time
-
-        print(f'Scheduler: {scheduler_name}')
-        for ready_time_permutation, avg_delta_time in sorted(perm_to_time.items(), key=lambda item: item[1]):
-            print(f'Ready time permutation: {ready_time_permutation}, Average delta time: {avg_delta_time}')
-        print()
+        # store results in dict
+        print_permutations(scheduler_name, perm_to_time, sort_by_avg_delta_time)
 
     permute(NpSjfScheduler, 'Shortest Job First (nonpreemptive)')
     permute(PSjfScheduler, 'Shortest Job First (preemptive)')
