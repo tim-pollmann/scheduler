@@ -27,12 +27,16 @@ class Scheduler(ABC):
 
     @property
     def avg_delta_time(self):
-        return sum(self._delta_times) / len(self._delta_times)
+        return '{:4.2f}'.format(sum(self._delta_times) / len(self._delta_times))
+
+    # runs the complete simulation until all processes are finished
+    def run_until_finished(self):
+        while self.step():
+            pass
 
     # represents one clock-cycle
     def step(self):
         # one clock-cycle consists of the following 3 steps
-
         # 1. move processes, that got ready at the current time, from the blocked-list to the ready-list
         self._ready_processes.extend([process for process in self._blocked_processes
                                       if process.ready_time <= self._time])
@@ -58,7 +62,7 @@ class Scheduler(ABC):
         return True
 
     def _log(self, text):
-        self._logger += ' [TIME = ' + "{:2.0f}".format(self._time) + '] ' + text + '\n'
+        self._logger += ' [TIME = ' + '{:2.0f}'.format(self._time) + '] ' + text + '\n'
 
     def _allocate_process(self, cpu, process):
         self._ready_processes.remove(process)
@@ -66,8 +70,8 @@ class Scheduler(ABC):
         self._log(f'Allocated process {process.id} to CPU #{cpu.id}')
 
     def _deallocate_process(self, cpu):
-        self._ready_processes.append(cpu.current_process)
         self._log(f'Deallocated process {cpu.current_process.id} from CPU #{cpu.id}')
+        self._ready_processes.append(cpu.current_process)
         cpu.deallocate_process()
 
     def _deallocate_finished_process(self, cpu):
@@ -82,7 +86,7 @@ class Scheduler(ABC):
         pass
 
     # sorts the processes based on the scheduler-strategy
-    # will be implemented by the ultimate schedulers
+    # will be implemented by the schedulers
     @staticmethod
     @abstractmethod
     def _sort_processes(process):
@@ -116,13 +120,13 @@ class PreemptiveScheduler(Scheduler, ABC):
         allocated_processes = [cpu.current_process for cpu in self._cpus if
                                cpu.has_process and not cpu.has_finished_process]
 
-        # the best choice of all available processes
-        candidates = allocated_processes + self._ready_processes
-        candidates.sort(key=self._sort_processes)
-        candidates = candidates[:min(len(self._cpus), len(candidates))]
+        # get processes that need to be allocated in the next cycle base on the scheduling strategy
+        all_processes = allocated_processes + self._ready_processes
+        all_processes.sort(key=self._sort_processes)
+        next_processes = all_processes[:min(len(self._cpus), len(all_processes))]
 
-        # processes, that need to be allocated
-        not_allocated_candidates = set(candidates) - set(allocated_processes)
+        # next processes that are not allocated yet
+        not_allocated_processes = set(next_processes) - set(allocated_processes)
 
         for cpu in self._cpus:
             if cpu.has_finished_process:
@@ -130,15 +134,16 @@ class PreemptiveScheduler(Scheduler, ABC):
 
             # if there are ready process available
             if self._ready_processes:
-                # if a cpu has a process but there are better candidates
-                if cpu.has_process and cpu.current_process not in candidates:
+                # if a cpu has a process but that process is not meant to run in the next clock cycle
+                if cpu.has_process and cpu.current_process not in next_processes:
                     self._deallocate_process(cpu)
 
+                # if a cpu is free we can allocate any process
                 if not cpu.has_process:
-                    self._allocate_process(cpu, not_allocated_candidates.pop())
+                    self._allocate_process(cpu, not_allocated_processes.pop())
 
 
-# class for nonpreemptive "first come first served"-schedulers
+# class for nonpreemptive "first come first serve"-schedulers
 class NpFcfsScheduler(NonPreemptiveScheduler):
     def __init__(self, n_cpus, processes):
         super().__init__(n_cpus, processes)
@@ -179,6 +184,7 @@ class NpLlfScheduler(NonPreemptiveScheduler):
     @staticmethod
     def _sort_processes(process):
         # sort by laxity
+        # we do not need to consider the current timestamp here because it would be the same for every process
         return process.deadline - process.ready_time - process.exec_time
 
 
@@ -212,6 +218,7 @@ class PLlfScheduler(PreemptiveScheduler):
     @staticmethod
     def _sort_processes(process):
         # sort by laxity
+        # we do not need to consider the current timestamp here because it would be the same for every process
         return process.deadline - process.ready_time - process.exec_time
 
 
@@ -224,18 +231,20 @@ class PRrScheduler(PreemptiveScheduler):
         self._quantum_counter = 0
 
     # since the "round robin"-scheduler is mainly different from the other preemptive schedulers, we override this
-    # function and implement the "round robin"-schedulers own logic in there
+    # function and implement the "round robin"-schedulers own logic here
     def _update_process_allocation(self):
         cpu = self._cpus[0]
 
         if cpu.has_finished_process:
             self._deallocate_finished_process(cpu)
 
+        # if there are ready process available
         if self._ready_processes:
+            # if the current process had the cpu for quantum clock cycles
             if self._quantum_counter >= self._quantum and cpu.has_process:
                 self._deallocate_process(cpu)
 
-            # if a cpu has no process
+            # if the cpu has no process
             if not cpu.has_process:
                 self._quantum_counter = 0
                 self._allocate_process(cpu, self._ready_processes[0])
