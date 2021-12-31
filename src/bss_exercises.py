@@ -74,7 +74,7 @@ def exercise_2(quantum, sort_by_avg_delta_time):
                             for process
                             in permutation])] = scheduler.avg_delta_time
 
-    print_permutations(f'Round Robin (preemptive), Quantum: {quantum}', perm_to_time, sort_by_avg_delta_time)
+    print_permutations(f'{SCHEDULERS[7]}, Quantum: {quantum}', perm_to_time, sort_by_avg_delta_time)
 
 
 def exercise_3(sort_by_avg_delta_time):
@@ -97,5 +97,5 @@ def exercise_3(sort_by_avg_delta_time):
         # store results in dict
         print_permutations(scheduler_name, perm_to_time, sort_by_avg_delta_time)
 
-    permute(NpSjfScheduler, 'Shortest Job First (nonpreemptive)')
-    permute(PSjfScheduler, 'Shortest Job First (preemptive)')
+    permute(NpSjfScheduler, SCHEDULERS[1])
+    permute(PSjfScheduler, SCHEDULERS[4])
