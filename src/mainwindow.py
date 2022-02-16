@@ -57,23 +57,22 @@ class MainWindow(QMainWindow):
                      if checkbox.isChecked()]
 
         if processes:
-            match self._ui['strategy_selection'].currentIndex():
-                case 0:
-                    self._scheduler = NpFcfsScheduler(n_cpus, processes)
-                case 1:
-                    self._scheduler = NpSjfScheduler(n_cpus, processes)
-                case 2:
-                    self._scheduler = NpEdfScheduler(n_cpus, processes)
-                case 3:
-                    self._scheduler = NpLlfScheduler(n_cpus, processes)
-                case 4:
-                    self._scheduler = PSjfScheduler(n_cpus, processes)
-                case 5:
-                    self._scheduler = PEdfScheduler(n_cpus, processes)
-                case 6:
-                    self._scheduler = PLlfScheduler(n_cpus, processes)
-                case 7:
-                    self._scheduler = PRrScheduler(processes, self._ui['quantum_selection'].value())
+            if self._ui['strategy_selection'].currentIndex() == 0:
+                self._scheduler = NpFcfsScheduler(n_cpus, processes)
+            elif self._ui['strategy_selection'].currentIndex() == 1:
+                self._scheduler = NpSjfScheduler(n_cpus, processes)
+            elif self._ui['strategy_selection'].currentIndex() == 2:
+                self._scheduler = NpEdfScheduler(n_cpus, processes)
+            elif self._ui['strategy_selection'].currentIndex() == 3:
+                self._scheduler = NpLlfScheduler(n_cpus, processes)
+            elif self._ui['strategy_selection'].currentIndex() == 4:
+                self._scheduler = PSjfScheduler(n_cpus, processes)
+            elif self._ui['strategy_selection'].currentIndex() == 5:
+                self._scheduler = PEdfScheduler(n_cpus, processes)
+            elif self._ui['strategy_selection'].currentIndex() == 6:
+                self._scheduler = PLlfScheduler(n_cpus, processes)
+            elif self._ui['strategy_selection'].currentIndex() == 7:
+                self._scheduler = PRrScheduler(processes, self._ui['quantum_selection'].value())
 
             self._ui['init_sim_button'].setEnabled(False)
             self._ui['next_step_button'].setEnabled(True)

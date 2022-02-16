@@ -1,4 +1,3 @@
-import ctypes
 import argparse
 import sys
 from PyQt5.QtWidgets import QApplication
@@ -7,9 +6,6 @@ from bss_exercises import exercise_1, exercise_2, exercise_3
 
 
 if __name__ == '__main__':
-    # workaround to display custom taskbar icon
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('scheduler_and_process_simulator')
-
     parser = argparse.ArgumentParser()
     parser.add_argument('-1', '--exercise_1', action='store_true', help='execute exercise 1 on the commandline')
     parser.add_argument('-2', '--exercise_2', action='store_true', help='execute exercise 2 on the commandline')
